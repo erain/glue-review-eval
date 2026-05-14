@@ -44,9 +44,11 @@ Append-only log of phase milestones. Lets a fresh session resume cleanly.
 
 ## Phase 5 — Ship (done)
 
-- `release/v3-default` PR in `erain/glue` bumps `defaultPromptVersion` to `v3`, rewrites the agent README around the v3 story, and tags `v2.0.0`.
-- Action.yml soft-fail behaviour fixed (`action/safer-soft-fail`): a transient upstream rate-limit no longer overwrites a previous good review.
-- `.github/workflows/glue-review-smoke.yml` re-pinned from `erain/glue@eval/v4` to `erain/glue/agents/glue-review@v2`; the throwaway `eval/v3` / `eval/v4` branches were deleted from `erain/glue`.
+The winning eval-side prompt is now the only prompt in `erain/glue` — `agents/glue-review/prompts/default.md`. There is no version selector, no legacy multi-section format, no inline-comment plumbing. The agent ships one product shape and one default provider (`openrouter`); `--provider openrouter,nvidia,gemini` is still available as a manual failover chain.
+
+- Action's sticky-comment post is the only output path. Soft-fail behaviour preserves a previous good review when a re-run hits an upstream blip (emits `::warning::` instead of overwriting).
+- Workflows declare `issues: write` so the action can post the sticky comment on the PR thread.
+- `.github/workflows/glue-review-smoke.yml` pinned to `erain/glue/agents/glue-review@main`; throwaway `eval/v3` / `eval/v4` branches were deleted from `erain/glue`; legacy `v1*` / `v2*` tags + releases were deleted (no users, no migration cliff).
 - Secrets on `erain/glue-review-eval`: `OPENROUTER_API_KEY`, `NVIDIA_API_KEY`.
-- Smoke PR `glue-review-eval#1` re-triggered on `@v2` — comment landed correctly with the new format.
+- Smoke PR `glue-review-eval#1` exercises the action end-to-end on a real PR thread.
 

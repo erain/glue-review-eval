@@ -145,7 +145,7 @@ All three target regressions recovered (+1.67, +2.67, +2.00 per-case delta on th
 
 The eval repo's own `.github/workflows/glue-review-smoke.yml` exercises the real composite Action against a real PR:
 
-- Workflow pinned to `erain/glue/agents/glue-review@v2` (the [v2.0.0 release](https://github.com/erain/glue/releases/tag/v2.0.0)).
+- Workflow pinned to `erain/glue/agents/glue-review@main` (no tagged releases yet; the public launch and the first tag land together).
 - Secrets set on `erain/glue-review-eval`: `OPENROUTER_API_KEY`, `NVIDIA_API_KEY`.
 - Triggered on PRs labelled `eval-smoke`, or via `workflow_dispatch` with a PR number.
 - Smoke PR: https://github.com/erain/glue-review-eval/pull/1 (plants a SQL injection in `smoke-demo/app.py:find_by_url_like`).
@@ -175,12 +175,13 @@ REVIEW_PROMPT_VERSION=v2 ./tools/iterate.sh v2 my-baseline 8
 
 ## Shipped
 
-The winning eval-side `v4` prompt was promoted to `v3.md` on
-`erain/glue/main` and is the **default** prompt as of
-[`v2.0.0`](https://github.com/erain/glue/releases/tag/v2.0.0)
-(merged via [erain/glue#108](https://github.com/erain/glue/pull/108)).
+The winning prompt is the only prompt in `erain/glue` — embedded at
+`agents/glue-review/prompts/default.md`. There is no version
+selector, no legacy multi-section format, no inline-comment plumbing.
+One product shape, one default provider (`openrouter`).
 
 Companion shipped changes:
 
-- `erain/glue#107` — safer soft-fail behaviour in the Action so a transient upstream rate-limit on a re-run no longer overwrites a previous good review.
-- The eval smoke workflow now pins `erain/glue/agents/glue-review@v2` so the canonical install pattern stays exercised on every commit to this repo's `smoke/sql-injection` branch.
+- Safer soft-fail behaviour in the Action: a transient upstream rate-limit on a re-run no longer overwrites a previous good review.
+- Action workflows declare `issues: write` so the sticky comment can land on the PR thread.
+- The eval smoke workflow pins `erain/glue/agents/glue-review@main` so the canonical install pattern stays exercised on every push to this repo's `smoke/sql-injection` branch.

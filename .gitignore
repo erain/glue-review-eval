@@ -1,0 +1,20 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+
+# Per-case raw outputs are large; we keep summaries committed and gitignore raw artefacts.
+results/**/stderr.log
+results/**/exit_code
+results/**/ERROR.log
+results/**/TIMEOUT
+
+# Node / Python / Go build artefacts inside hosts.
+hosts/*/node_modules/
+hosts/*/.next/
+hosts/*/dist/
+hosts/*/__pycache__/
+hosts/*/.pytest_cache/
+hosts/*/*.db
+hosts/*/*.db-journal

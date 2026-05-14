@@ -145,7 +145,7 @@ All three target regressions recovered (+1.67, +2.67, +2.00 per-case delta on th
 
 The eval repo's own `.github/workflows/glue-review-smoke.yml` exercises the real composite Action against a real PR:
 
-- Workflow pinned to `erain/glue@eval/v4` (the winner ref).
+- Workflow pinned to `erain/glue/agents/glue-review@v2` (the [v2.0.0 release](https://github.com/erain/glue/releases/tag/v2.0.0)).
 - Secrets set on `erain/glue-review-eval`: `OPENROUTER_API_KEY`, `NVIDIA_API_KEY`.
 - Triggered on PRs labelled `eval-smoke`, or via `workflow_dispatch` with a PR number.
 - Smoke PR: https://github.com/erain/glue-review-eval/pull/1 (plants a SQL injection in `smoke-demo/app.py:find_by_url_like`).
@@ -173,8 +173,14 @@ REVIEW_PROMPT_VERSION=v2 ./tools/iterate.sh v2 my-baseline 8
 .venv/bin/python -m harness.layer3 --iter my-v4 --executor codex
 ```
 
-## Ship recommendation
+## Shipped
 
-Ship v4 (eval-side `eval/v4` branch; renamed to `v3.md` on glue main) as the next sequential prompt version on `erain/glue`. Keep `defaultPromptVersion` at v2 for one release window so consumers can opt-in via `--prompt-version v3`; promote to default once one or two real downstream-Action installs have confirmed the new comment shape.
+The winning eval-side `v4` prompt was promoted to `v3.md` on
+`erain/glue/main` and is the **default** prompt as of
+[`v2.0.0`](https://github.com/erain/glue/releases/tag/v2.0.0)
+(merged via [erain/glue#108](https://github.com/erain/glue/pull/108)).
 
-Companion PR draft: `results/SHIP_PR_BODY.md`.
+Companion shipped changes:
+
+- `erain/glue#107` — safer soft-fail behaviour in the Action so a transient upstream rate-limit on a re-run no longer overwrites a previous good review.
+- The eval smoke workflow now pins `erain/glue/agents/glue-review@v2` so the canonical install pattern stays exercised on every commit to this repo's `smoke/sql-injection` branch.

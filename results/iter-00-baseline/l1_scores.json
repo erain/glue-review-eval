@@ -53,11 +53,11 @@
     "case_id": "g-multi-render-and-test",
     "language": "go",
     "category": "multi-bug",
-    "flagged_file": 0.0,
-    "flagged_concept": 0.0,
-    "no_false_positives": 0.0,
+    "flagged_file": 1.0,
+    "flagged_concept": 0.75,
+    "no_false_positives": 1.0,
     "has_fix_block": 0.0,
-    "no_severity_bullets": 0.0
+    "no_severity_bullets": 1.0
   },
   {
     "case_id": "g-off-by-one-bound",
@@ -204,7 +204,7 @@
     "language": "typescript",
     "category": "clean",
     "flagged_file": 1.0,
-    "flagged_concept": 0.0,
+    "flagged_concept": 1.0,
     "no_false_positives": 1.0,
     "has_fix_block": 1.0,
     "no_severity_bullets": 1.0
@@ -213,8 +213,8 @@
     "case_id": "t-debounce-removed",
     "language": "typescript",
     "category": "perf",
-    "flagged_file": 0.0,
-    "flagged_concept": 0.0,
+    "flagged_file": 1.0,
+    "flagged_concept": 1.0,
     "no_false_positives": 1.0,
     "has_fix_block": 0.0,
     "no_severity_bullets": 1.0
@@ -243,28 +243,28 @@
     "case_id": "t-multi-effect-and-leak",
     "language": "typescript",
     "category": "multi-bug",
-    "flagged_file": 0.0,
-    "flagged_concept": 0.0,
-    "no_false_positives": 0.0,
+    "flagged_file": 1.0,
+    "flagged_concept": 1.0,
+    "no_false_positives": 1.0,
     "has_fix_block": 0.0,
-    "no_severity_bullets": 0.0
+    "no_severity_bullets": 1.0
   },
   {
     "case_id": "t-rejected-context-everything",
     "language": "typescript",
     "category": "rejected-direction",
-    "flagged_file": 0.0,
-    "flagged_concept": 0.0,
-    "no_false_positives": 0.0,
+    "flagged_file": 1.0,
+    "flagged_concept": 1.0,
+    "no_false_positives": 1.0,
     "has_fix_block": 0.0,
-    "no_severity_bullets": 0.0
+    "no_severity_bullets": 1.0
   },
   {
     "case_id": "t-stale-closure-effect",
     "language": "typescript",
     "category": "logic-bug",
-    "flagged_file": 0.0,
-    "flagged_concept": 0.0,
+    "flagged_file": 1.0,
+    "flagged_concept": 1.0,
     "no_false_positives": 1.0,
     "has_fix_block": 0.0,
     "no_severity_bullets": 1.0
@@ -273,8 +273,8 @@
     "case_id": "t-xss-skip-sanitize",
     "language": "typescript",
     "category": "security",
-    "flagged_file": 0.0,
-    "flagged_concept": 0.0,
+    "flagged_file": 1.0,
+    "flagged_concept": 1.0,
     "no_false_positives": 1.0,
     "has_fix_block": 0.0,
     "no_severity_bullets": 1.0

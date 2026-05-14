@@ -24,6 +24,9 @@ GLUE_REVIEW_BIN = GLUE_REPO / "glue-review"
 # that's the indie-hacker shipping target, then NVIDIA (the dev fallback
 # that the glue CI also exercises), then Gemini.
 def _default_provider() -> tuple[str, str]:
+    # Stay on one provider per measurement so v2 vs v3 vs ... comparisons
+    # aren't muddied by provider drift. Preference order = indie-hacker
+    # shipping target first.
     if os.environ.get("OPENROUTER_API_KEY"):
         return "openrouter", "inclusionai/ring-2.6-1t:free"
     if os.environ.get("NVIDIA_API_KEY"):

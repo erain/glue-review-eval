@@ -86,10 +86,18 @@ def _run_test(repo: Path, test_cmd: str, timeout_s: int) -> bool:
 def _invoke_executor(executor: str, repo: Path, instructions: str, timeout_s: int) -> tuple[bool, str]:
     """Hand `instructions` to a coding agent run in `repo`. Returns (success, notes)."""
     if executor == "codex":
-        # codex exec runs a single-shot non-interactive task in the cwd.
-        # `--cd` pins the working directory; `--full-auto` allows file edits.
-        # Model defaults to whatever the user has configured globally.
-        cmd = ["codex", "exec", "--cd", str(repo), "--full-auto", instructions]
+        # codex exec runs a single-shot non-interactive task. `-C` pins the
+        # working directory; the bypass flag is required for headless edits
+        # (otherwise codex stops to ask for approval). The case repo is a
+        # fresh tmpdir, so the danger label is appropriate to the contained
+        # blast radius.
+        cmd = [
+            "codex", "exec",
+            "-C", str(repo),
+            "--dangerously-bypass-approvals-and-sandbox",
+            "--skip-git-repo-check",
+            instructions,
+        ]
     elif executor == "opencode":
         cmd = ["opencode", "run", "--cd", str(repo), instructions]
     elif executor == "claude":
@@ -220,7 +228,16 @@ def main() -> int:
         time.sleep(2)
 
     out = iter_dir / f"l3_{args.executor}.json"
-    out.write_text(json.dumps([asdict(r) for r in results], indent=2))
+    # Merge with any prior run (so spot-checks accumulate into a full batch).
+    prior: list[dict] = []
+    if out.exists():
+        try:
+            prior = json.loads(out.read_text())
+        except Exception:
+            prior = []
+    fresh = {r.case_id for r in results}
+    merged = [p for p in prior if p["case_id"] not in fresh] + [asdict(r) for r in results]
+    out.write_text(json.dumps(merged, indent=2))
 
     passed = sum(1 for r in results if r.acceptance_passed)
     print(f"\nLayer 3 pass-rate ({args.executor}): {passed}/{len(results)} = "

@@ -1,0 +1,13 @@
+[
+  {
+    "case_id": "g-ignored-unmarshal-err",
+    "language": "go",
+    "category": "logic-bug",
+    "executor": "codex",
+    "had_fix_block": true,
+    "fix_applied": true,
+    "acceptance_passed": true,
+    "test_cmd": "go test ./entry/ -run TestParse_InvalidJSONIsUnparsed",
+    "notes": "ok"
+  }
+]

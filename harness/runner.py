@@ -20,7 +20,9 @@ import time
 from pathlib import Path
 
 from .cases import Case, discover_cases
-from .config import GLUE_REVIEW_BIN, PATHS, REVIEW_MODEL, REVIEW_PROVIDER
+from .config import (
+    GLUE_REVIEW_BIN, PATHS, REVIEW_MODEL, REVIEW_PROMPT_VERSION, REVIEW_PROVIDER,
+)
 
 
 def _git(cwd: Path, *args: str, check: bool = True) -> subprocess.CompletedProcess:
@@ -116,6 +118,7 @@ def run_one(case: Case, iter_dir: Path, work_root: Path) -> Path:
         "--base", "main",
         "--provider", REVIEW_PROVIDER,
         "--model", REVIEW_MODEL,
+        "--prompt-version", REVIEW_PROMPT_VERSION,
         "--store", str(work_root / "store"),
         "--id", f"eval-{case.language}-{case.id}",
         "--max-turns", "8",

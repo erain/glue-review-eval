@@ -1,0 +1,68 @@
+id: g-multi-render-and-test
+language: go
+host: go-glog
+category: multi-bug
+severity: high
+title: "render: add --out csv mode"
+summary: |
+  Adds a CSV output mode to render.New (--out csv) emitting four columns
+  per entry: ts, level, msg, fields. The fields column is the existing
+  key=val tail joined by spaces, so it can carry the same data plain mode
+  already shows.
+
+planted:
+  description: |
+    The PR has two independent issues that a reviewer must flag together
+    or the fix-block will be incomplete:
+
+      (a) The CSV renderer does not escape field values. Row construction
+          is `strings.Join(row, ",") + "\n"`, with no quoting of values
+          that contain commas, double quotes, or newlines. A message of
+          "hello, world" splits across three columns and the row width
+          ceases to match the column count — any spreadsheet or
+          encoding/csv reader will mis-align downstream fields.
+
+      (b) The PR ships the CSV renderer with only a single planted test
+          that itself fails on the buggy implementation. There is no
+          unit test exercising the renderer's correctness across the
+          shape of inputs it claims to support — empty fields, embedded
+          quotes, embedded newlines, the no-fields case. A reviewer
+          should call this out as inadequate coverage and require a
+          real render_test.go entry for the csv type.
+  files:
+    - path: render/render.go
+      lines: [30, 75]
+      kind: incorrect-csv-escaping
+    - path: render/render.go
+      lines: [30, 75]
+      kind: missing-test
+
+expected:
+  must_flag:
+    - "(render/render\\.go|render\\.go)"
+    - "csv|--out csv|csv renderer"
+    - "(escape|escaping|quote|quoting|encoding/csv|csv\\.Writer)"
+    - "(missing[ -]?test|no[ -]?test|no coverage|inadequate|insufficient)|test.{0,20}(missing|inadequate|fail)"
+  must_not_flag:
+    - "race condition"
+    - "memory leak"
+    - "sql injection"
+  fix_directives:
+    - "rewrite csv.Render to use encoding/csv (csv.NewWriter / w.Write([]string{...})) so values containing commas, double quotes, or newlines are properly quoted"
+    - "add a render_test.go entry exercising the csv renderer directly: values with embedded commas, values with embedded quotes, empty values, and the no-fields case — assert each emitted line is parseable by encoding/csv and yields exactly four columns"
+    - "the existing render_csv_test.go is the minimum acceptance gate, not adequate coverage; extend it (or add a TestCSV_Render table-test) before merging"
+
+acceptance:
+  setup: []
+  test_cmd: "go test ./render/ -run TestCSV_QuotesValuesWithCommas"
+  timeout_s: 60
+
+notes: |
+  Multi-bug case. Acceptance gate is
+  `TestCSV_QuotesValuesWithCommas`: it builds an Entry with a `msg` of
+  `hello, world` and a field value `a, b`, runs the csv renderer, and
+  asserts encoding/csv parses the output into exactly one record with
+  four columns. Buggy code emits six columns (msg + tail split on the
+  unescaped commas); the fix (use encoding/csv) collapses it back to
+  four. The reviewer must flag both the escaping bug and the absence of
+  broader test coverage — partial credit if only one is surfaced.

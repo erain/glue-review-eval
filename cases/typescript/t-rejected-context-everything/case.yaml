@@ -1,0 +1,64 @@
+id: t-rejected-context-everything
+language: typescript
+host: ts-notepad
+category: rejected-direction
+severity: medium
+title: "notes: introduce global NotesContext and consume from Editor/Preview"
+summary: |
+  Adds `src/contexts/NotesContext.tsx`, wraps `<App>` in a
+  `NotesProvider` from `main.tsx`, and refactors `Editor` and `Preview`
+  to read the active note from `useNotesContext()` instead of taking
+  props. Justified as "global state is cleaner than prop drilling".
+
+planted:
+  description: |
+    There is no prop-drilling problem to solve. The existing `useNotes`
+    hook is already the single source of truth — `App.tsx` calls it
+    once and passes a handful of values straight to direct children
+    (no intermediate layers). Putting a context between them adds:
+
+      - an extra file and an extra layer of indirection,
+      - boilerplate at every render site (`useNotesContext()` + null
+        guards on `selectedNote` inside Editor/Preview),
+      - a hidden coupling that breaks the ability to render `Editor` or
+        `Preview` outside a `NotesProvider` (tests now have to wrap
+        every render),
+      - a singleton constraint — `useNotes` could previously back
+        multiple independent notepads in the same tree; the context
+        forces a single provider per subtree.
+
+    None of those tradeoffs buy anything because the cross-component
+    state-sharing surface is already trivial.
+  files:
+    - path: src/contexts/NotesContext.tsx
+      lines: [1, 30]
+      kind: unnecessary-indirection
+    - path: src/components/Editor.tsx
+      lines: [1, 20]
+      kind: prop-removed
+    - path: src/components/Preview.tsx
+      lines: [1, 20]
+      kind: prop-removed
+
+expected:
+  must_flag:
+    - "(context|NotesContext|useNotesContext|NotesProvider)"
+    - "(wrong direction|revert|rollback|not needed|unnecessary)"
+    - "(useNotes|prop drilling|boilerplate|indirection)"
+  must_not_flag:
+    - "memory leak"
+    - "xss"
+    - "race condition"
+  fix_directives: []
+
+notes: |
+  Rejected-direction case — no acceptance gate. The reviewer's job is
+  to push back on the architectural premise: "there is no
+  prop-drilling problem here, revert the context and keep `useNotes`
+  direct in App.tsx with props down to Editor/Preview". A correct
+  review identifies the change as adding indirection without value
+  and recommends rollback rather than incremental tweaks.
+
+  Common false positives to guard against: claiming the context
+  introduces a memory leak (it does not), an XSS surface (no markup
+  change), or a race condition (no async work added).

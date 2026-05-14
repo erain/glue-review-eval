@@ -37,6 +37,12 @@ _provider, _model = _default_provider()
 REVIEW_PROVIDER = os.environ.get("REVIEW_PROVIDER", _provider)
 REVIEW_MODEL = os.environ.get("REVIEW_MODEL", _model)
 
+# Which embedded system prompt glue-review loads. Default v2 = the
+# pre-eval baseline; iterations move to v3, v4, ... by both writing
+# the new file into glue/agents/glue-review/prompts/<vN>.md (then
+# rebuilding the binary) and setting REVIEW_PROMPT_VERSION=<vN>.
+REVIEW_PROMPT_VERSION = os.environ.get("REVIEW_PROMPT_VERSION", "v2")
+
 # Layer 2 judge.
 JUDGE_MODEL = os.environ.get("JUDGE_MODEL", "claude-sonnet-4-6")
 

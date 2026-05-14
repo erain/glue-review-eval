@@ -1,0 +1,117 @@
+diff --git a/src/App.tsx b/src/App.tsx
+index d60325e..a6e9cc0 100644
+--- a/src/App.tsx
++++ b/src/App.tsx
+@@ -51,6 +51,7 @@ export default function App() {
+         {selectedNote ? (
+           <>
+             <Editor
++              noteId={selectedNote.id}
+               value={selectedNote.body}
+               onChange={(body) => updateBody(selectedNote.id, body)}
+             />
+diff --git a/src/__tests__/editor-leak.test.tsx b/src/__tests__/editor-leak.test.tsx
+new file mode 100644
+index 0000000..e40eaff
+--- /dev/null
++++ b/src/__tests__/editor-leak.test.tsx
+@@ -0,0 +1,32 @@
++/** Regression: Editor must not leak setTimeout timers across noteId/value changes. */
++
++import { render } from '@testing-library/react';
++import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
++import Editor from '../components/Editor';
++
++beforeEach(() => {
++  vi.useFakeTimers();
++});
++
++afterEach(() => {
++  vi.useRealTimers();
++});
++
++describe('Editor: auto-clear unsaved indicator', () => {
++  it('does not leak timers when the active note switches rapidly', () => {
++    const { rerender } = render(
++      <Editor noteId="a" value="first body" onChange={() => {}} />,
++    );
++
++    // Simulate switching to several different notes in quick succession.
++    // Each one carries a different body, which is what the flash effect
++    // keys off. The auto-clear timer for the previous note should be
++    // cancelled before the next one is armed.
++    rerender(<Editor noteId="b" value="second body" onChange={() => {}} />);
++    rerender(<Editor noteId="c" value="third body" onChange={() => {}} />);
++    rerender(<Editor noteId="d" value="fourth body" onChange={() => {}} />);
++    rerender(<Editor noteId="e" value="fifth body" onChange={() => {}} />);
++
++    expect(vi.getTimerCount()).toBeLessThanOrEqual(1);
++  });
++});
+diff --git a/src/components/Editor.tsx b/src/components/Editor.tsx
+index 9ba6adb..173d777 100644
+--- a/src/components/Editor.tsx
++++ b/src/components/Editor.tsx
+@@ -1,21 +1,52 @@
+ /** Plain-textarea markdown editor. */
+ 
++import { useEffect, useState } from 'react';
++
++const UNSAVED_FLASH_MS = 1500;
++
+ export interface EditorProps {
++  noteId: string;
+   value: string;
+   onChange: (next: string) => void;
+   disabled?: boolean;
+ }
+ 
+-export default function Editor({ value, onChange, disabled }: EditorProps) {
++export default function Editor({ noteId, value, onChange, disabled }: EditorProps) {
++  const [unsavedFor, setUnsavedFor] = useState<string | null>(null);
++
++  // Auto-clear the "unsaved" pip a short while after the user pauses
++  // typing. Persistence itself is owned by useNotes' debounce — this
++  // is purely a visual nicety so the pip doesn't linger forever after
++  // a quiet save.
++  useEffect(() => {
++    // Only arm the timer once we've actually seen an edit on this note.
++    if (!value) return;
++    setTimeout(() => {
++      setUnsavedFor((prev) => (prev === noteId ? null : prev));
++    }, UNSAVED_FLASH_MS);
++    // We intentionally key this off `value` only — the pip is cosmetic
++    // and re-arming on every prop change would feel jittery.
++  }, [value]);
++
+   return (
+-    <textarea
+-      className="editor"
+-      aria-label="Note editor"
+-      value={value}
+-      onChange={(e) => onChange(e.target.value)}
+-      disabled={disabled}
+-      spellCheck
+-      placeholder={disabled ? '' : 'Write some markdown...'}
+-    />
++    <div className="editor__wrap">
++      <textarea
++        className="editor"
++        aria-label="Note editor"
++        value={value}
++        onChange={(e) => {
++          setUnsavedFor(noteId);
++          onChange(e.target.value);
++        }}
++        disabled={disabled}
++        spellCheck
++        placeholder={disabled ? '' : 'Write some markdown...'}
++      />
++      {unsavedFor === noteId ? (
++        <span className="editor__unsaved" data-note-id={noteId} aria-live="polite">
++          unsaved
++        </span>
++      ) : null}
++    </div>
+   );
+ }

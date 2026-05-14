@@ -1,0 +1,72 @@
+id: t-multi-effect-and-leak
+language: typescript
+host: ts-notepad
+category: multi-bug
+severity: high
+title: "Editor: auto-clear unsaved indicator after a short flash"
+summary: |
+  Adds a tiny "unsaved" pip next to the textarea that flashes when the
+  user types, then quietly hides itself after `UNSAVED_FLASH_MS`.
+  Persistence itself is still owned by `useNotes`' debounce — this is
+  a cosmetic affordance so the pip doesn't linger forever after a
+  silent save. App.tsx now passes `noteId` through to Editor.
+
+planted:
+  description: |
+    Two independent issues live in the same `useEffect` inside
+    `Editor.tsx`:
+
+      (a) The effect closes over `noteId` (it calls `setUnsavedFor`
+          with `prev === noteId` semantics inside the setTimeout
+          callback) but the dependency array is `[value]`. When the
+          user switches notes mid-flash, the timer that eventually
+          fires references the *old* noteId, and can incorrectly clear
+          the unsaved pip on the wrong note.
+
+      (b) The `setTimeout` handle is never captured, so there is no
+          `clearTimeout` in the effect's cleanup. Every value change
+          arms a fresh timer while the old one keeps ticking; rapidly
+          switching notes leaks N timers, which (i) shows up as
+          duplicate state writes when they all fire, and (ii) is
+          exactly what React strict-mode's double-invoke is designed
+          to surface.
+
+    A correct fix must address both: add `noteId` to the deps array
+    AND cancel the timer in the cleanup function.
+  files:
+    - path: src/components/Editor.tsx
+      lines: [18, 30]
+      kind: missing-deps-and-cleanup
+
+expected:
+  must_flag:
+    - "(useEffect|effect)"
+    - "(dependency|deps array|dep array|dependencies)"
+    - "(setTimeout|clearTimeout|cleanup|leak)"
+    - "src/components/Editor\\.tsx|Editor\\.tsx"
+  must_not_flag:
+    - "xss"
+    - "sql injection"
+    - "type widening"
+  fix_directives:
+    - "add `noteId` to the useEffect dependency array so the timer re-arms when the active note changes"
+    - "capture the setTimeout handle and clear it from the effect's cleanup function (return () => clearTimeout(timer))"
+    - "consider keying the effect off the unsaved-state transition rather than the raw value, but at minimum the deps + cleanup must be fixed"
+
+acceptance:
+  setup: []
+  test_cmd: "npm test -- --run src/__tests__/editor-leak.test.tsx"
+  timeout_s: 120
+
+notes: |
+  Acceptance test mounts the Editor and rerenders with five different
+  `noteId`/`value` pairs in quick succession, then asserts
+  `vi.getTimerCount() <= 1`. The buggy code leaks one timer per
+  rerender (count = 5); the fix adds `return () => clearTimeout(timer)`
+  to the effect and lists `noteId` in deps, which cancels the previous
+  timer before arming the next one.
+
+  Reviewer's fix block must have at least two items because the deps
+  bug and the leak bug are genuinely independent — fixing only one
+  leaves the other in place. A common false move is to flag just the
+  leak and miss the stale-noteId closure problem.

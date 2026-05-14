@@ -1,0 +1,57 @@
+name: glue-review smoke
+
+# End-to-end stage that exercises the real glue-review GitHub Action
+# (composite, builds from the pinned ref) against a real PR on this repo.
+# Catches integration regressions that the local harness can't:
+#   - Action wiring (token, working-dir, post-comment step)
+#   - Secret propagation in CI
+#   - The "comment lands on the PR thread" surface
+#
+# The action ref `erain/glue@eval/v3` pins to the v3 prompt branch in the
+# glue repo. Once v3 is merged into glue main, this should be re-pinned
+# to a release tag.
+
+on:
+  pull_request:
+    # Only run on PRs that opt in via the `eval-smoke` label. Avoids
+    # spending CI minutes on infra PRs (workflow tweaks, doc edits)
+    # that don't need a review.
+    types: [opened, synchronize, reopened, labeled]
+  workflow_dispatch:
+    # Manual trigger so we can re-run the smoke against an arbitrary
+    # PR number without re-opening it.
+    inputs:
+      pr-number:
+        description: "PR number to review"
+        required: true
+
+permissions:
+  pull-requests: write   # post / update the sticky comment
+  issues: write          # the action also touches issue comments for fallback
+  contents: read
+
+jobs:
+  smoke:
+    name: glue-review on PR
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      contains(github.event.pull_request.labels.*.name, 'eval-smoke')
+    steps:
+      - name: Checkout (for the PR's diff context)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Run glue-review
+        uses: erain/glue/agents/glue-review@eval/v3
+        with:
+          provider: openrouter
+          model: inclusionai/ring-2.6-1t:free
+          prompt-version: v3
+          openrouter-api-key: ${{ secrets.OPENROUTER_API_KEY }}
+          nvidia-api-key: ${{ secrets.NVIDIA_API_KEY }}
+          base-ref: ${{ github.event.pull_request.base.ref || 'main' }}
+          pr-number: ${{ github.event.pull_request.number || inputs.pr-number }}
+          # Default max-turns 12 is fine; the case patches are small.

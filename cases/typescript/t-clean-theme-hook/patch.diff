@@ -1,0 +1,73 @@
+diff --git a/src/App.tsx b/src/App.tsx
+index d60325e..522d774 100644
+--- a/src/App.tsx
++++ b/src/App.tsx
+@@ -5,6 +5,7 @@ import NoteList from './components/NoteList';
+ import Editor from './components/Editor';
+ import Preview from './components/Preview';
+ import { useNotes } from './hooks/useNotes';
++import { useColorScheme } from './hooks/useColorScheme';
+ import './App.css';
+ 
+ export default function App() {
+@@ -19,6 +20,15 @@ export default function App() {
+     flush,
+   } = useNotes();
+ 
++  // Expose the OS color preference on <html data-theme="..."> so CSS can key
++  // off it without each component re-reading matchMedia directly.
++  const scheme = useColorScheme();
++  useEffect(() => {
++    if (typeof document !== 'undefined') {
++      document.documentElement.dataset.theme = scheme;
++    }
++  }, [scheme]);
++
+   useEffect(() => {
+     function onKey(e: KeyboardEvent) {
+       const mod = e.metaKey || e.ctrlKey;
+diff --git a/src/hooks/useColorScheme.ts b/src/hooks/useColorScheme.ts
+new file mode 100644
+index 0000000..071194f
+--- /dev/null
++++ b/src/hooks/useColorScheme.ts
+@@ -0,0 +1,39 @@
++/** Reactive color-scheme hook driven by the OS `prefers-color-scheme` media query. */
++
++import { useEffect, useState } from 'react';
++
++export type ColorScheme = 'dark' | 'light';
++
++const QUERY = '(prefers-color-scheme: dark)';
++
++function read(): ColorScheme {
++  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
++    return 'light';
++  }
++  return window.matchMedia(QUERY).matches ? 'dark' : 'light';
++}
++
++/**
++ * Returns the user's current OS color preference, kept in sync with system
++ * changes. Safe to call during SSR — defaults to 'light' when there is no
++ * `window.matchMedia`.
++ */
++export function useColorScheme(): ColorScheme {
++  const [scheme, setScheme] = useState<ColorScheme>(() => read());
++
++  useEffect(() => {
++    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
++      return;
++    }
++    const mql = window.matchMedia(QUERY);
++    const onChange = (e: MediaQueryListEvent) => {
++      setScheme(e.matches ? 'dark' : 'light');
++    };
++    // addEventListener is the modern API; some older Safari builds still need
++    // addListener, but jsdom and every current browser support both.
++    mql.addEventListener('change', onChange);
++    return () => mql.removeEventListener('change', onChange);
++  }, []);
++
++  return scheme;
++}

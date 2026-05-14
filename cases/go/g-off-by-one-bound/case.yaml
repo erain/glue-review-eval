@@ -1,0 +1,45 @@
+id: g-off-by-one-bound
+language: go
+host: go-glog
+category: logic-bug
+severity: high
+title: "cmd/glog: add --last N flag"
+summary: |
+  Adds a --last N flag that prints only the most recent N matched
+  entries. Buffers rendered lines and slices the tail at the end.
+
+planted:
+  description: |
+    The slice index in `start := len(buf) - opt.last - 1` is off by one —
+    it returns N+1 entries (the requested window plus one extra older
+    entry). For --last 3 against 5 matching entries, the output is 4
+    lines instead of 3. The accompanying test (last_test.go) demonstrates
+    this directly.
+  files:
+    - path: cmd/glog/main.go
+      lines: [125, 140]
+      kind: off-by-one
+
+expected:
+  must_flag:
+    - "cmd/glog/main\\.go|main\\.go"
+    - "(off[ -]?by[ -]?one|one extra|wrong[ -]?slice|wrong[ -]?window|N\\+1)"
+    - "last|--last"
+  must_not_flag:
+    - "race condition"
+    - "memory leak"
+    - "deadlock"
+  fix_directives:
+    - "change `start := len(buf) - opt.last - 1` to `start := len(buf) - opt.last`"
+    - "the existing `if start < 0 { start = 0 }` guard already handles the N>len(buf) case after the fix"
+
+acceptance:
+  setup: []
+  test_cmd: "go test ./cmd/glog/ -run TestRun_LastReturnsExactlyN"
+  timeout_s: 60
+
+notes: |
+  Acceptance is `TestRun_LastReturnsExactlyN`: feeds 5 entries with --last
+  3 and asserts exactly 3 output lines. Buggy code emits 4. Fix is a
+  one-character edit (-1 → no -1) so a coding agent should land it
+  trivially given a specific directive.

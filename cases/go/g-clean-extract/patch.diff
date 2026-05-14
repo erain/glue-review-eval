@@ -1,0 +1,40 @@
+diff --git a/render/render.go b/render/render.go
+index 334d5bd..4d27aab 100644
+--- a/render/render.go
++++ b/render/render.go
+@@ -63,13 +63,7 @@ func (plain) Render(w io.Writer, e entry.Entry) error {
+ 		b.WriteString(e.Msg)
+ 	}
+ 
+-	keys := make([]string, 0, len(e.Fields))
+-	for k := range e.Fields {
+-		if _, skip := reservedKeys[k]; skip {
+-			continue
+-		}
+-		keys = append(keys, k)
+-	}
++	keys := nonReservedKeys(e)
+ 	sort.Strings(keys)
+ 	for _, k := range keys {
+ 		v, _ := e.FieldString(k)
+@@ -83,6 +77,20 @@ func (plain) Render(w io.Writer, e entry.Entry) error {
+ 	return err
+ }
+ 
++// nonReservedKeys returns the entry's Fields keys with the positional
++// reserved keys (ts/time/level/msg/message) filtered out. Callers sort the
++// result themselves.
++func nonReservedKeys(e entry.Entry) []string {
++	keys := make([]string, 0, len(e.Fields))
++	for k := range e.Fields {
++		if _, skip := reservedKeys[k]; skip {
++			continue
++		}
++		keys = append(keys, k)
++	}
++	return keys
++}
++
+ func quoteIfNeeded(s string) string {
+ 	if s == "" {
+ 		return `""`

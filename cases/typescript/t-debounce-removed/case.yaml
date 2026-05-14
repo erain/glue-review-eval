@@ -1,0 +1,52 @@
+id: t-debounce-removed
+language: typescript
+host: ts-notepad
+category: perf
+severity: medium
+title: "useNotes: drop the persistence debounce"
+summary: |
+  Removes the `useDebouncedEffect` wrapper around `saveState` in
+  `useNotes` and persists on every state change instead. Justified as
+  "localStorage writes are fast" so the extra timer is unnecessary
+  ceremony.
+
+planted:
+  description: |
+    The previous implementation collapsed bursts of edits into a single
+    localStorage write 300 ms after the user stops typing. The new code
+    calls `saveState` from an unconditional `useEffect`, so every
+    keystroke (every `updateBody` call) triggers a full JSON.stringify
+    of the entire notes corpus plus a synchronous `localStorage.setItem`.
+    For a multi-kilobyte note being edited at typing speed this is a
+    real per-keystroke cost and pins the main thread on large corpora.
+  files:
+    - path: src/hooks/useNotes.ts
+      lines: [1, 35]
+      kind: missing-debounce
+    - path: src/__tests__/useNotes.test.ts
+      lines: [127, 147]
+      kind: weakened-test
+
+expected:
+  must_flag:
+    - "src/hooks/useNotes\\.ts|useNotes"
+    - "(debounce|coalesc|per[- ]keystroke|every (state )?change|throttle)"
+  must_not_flag:
+    - "race condition"
+    - "memory leak"
+    - "xss"
+  fix_directives:
+    - "wrap the saveState call in useDebouncedEffect (or equivalent) with a ~300ms delay"
+    - "keep flush() as a synchronous escape hatch for Cmd/Ctrl+S"
+    - "restore the existing useNotes tests so the debounce window is asserted"
+
+acceptance:
+  setup: []
+  test_cmd: "npm test -- --run src/__tests__/persistence-debounce.test.ts"
+  timeout_s: 120
+
+notes: |
+  The planted patch also relaxes two of the existing useNotes tests
+  (they previously asserted "nothing in localStorage right after
+  create"). A correct fix should re-tighten those assertions along
+  with reintroducing the debounce.

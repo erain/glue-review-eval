@@ -1,0 +1,35 @@
+diff --git a/src/utils/markdown.ts b/src/utils/markdown.ts
+index 8ede0a7..7fd7c0a 100644
+--- a/src/utils/markdown.ts
++++ b/src/utils/markdown.ts
+@@ -1,7 +1,6 @@
+-/** Markdown -> sanitized HTML pipeline. */
++/** Markdown -> HTML pipeline. */
+ 
+ import { marked } from 'marked';
+-import DOMPurify from 'dompurify';
+ 
+ marked.setOptions({
+   gfm: true,
+@@ -9,17 +8,12 @@ marked.setOptions({
+ });
+ 
+ /**
+- * Render markdown to safe HTML.
++ * Render markdown to HTML.
+  *
+  * marked is configured synchronously (no async extensions), so we cast its return
+- * value to string. The output is then run through DOMPurify before being injected
+- * via `dangerouslySetInnerHTML`.
++ * value to string. The result is injected via `dangerouslySetInnerHTML` in
++ * the Preview component.
+  */
+ export function renderMarkdown(body: string): string {
+-  const html = marked.parse(body ?? '', { async: false }) as string;
+-  return DOMPurify.sanitize(html, {
+-    USE_PROFILES: { html: true },
+-    // Tighten the default config: no inline event handlers, no `javascript:` URLs.
+-    FORBID_ATTR: ['style', 'onerror', 'onload'],
+-  });
++  return marked.parse(body ?? '', { async: false }) as string;
+ }

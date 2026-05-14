@@ -1,0 +1,35 @@
+id: t-clean-theme-hook
+language: typescript
+host: ts-notepad
+category: clean
+severity: none
+title: "theme: useColorScheme hook + <html data-theme>"
+summary: |
+  Adds a small `useColorScheme` hook that returns `'dark' | 'light'`
+  from `window.matchMedia('(prefers-color-scheme: dark)')`, kept in
+  sync with system changes, and wires it from `App.tsx` to set a
+  `data-theme` attribute on `<html>` so CSS can key off it.
+
+planted:
+  description: ""
+  files: []
+
+expected:
+  must_flag:
+    - "(LGTM|looks good|no (concerns|issues)|nothing blocking|ship it|approve)"
+  must_not_flag:
+    - "memory leak"
+    - "race condition"
+    - "xss"
+  fix_directives: []
+
+notes: |
+  Clean case. The hook guards `window` and `matchMedia` for SSR, the
+  `addEventListener('change', ...)` listener is cleaned up in the
+  effect's return, and the App.tsx `useEffect` is a one-line attribute
+  write. No behaviour break, no new dependencies, existing tests pass.
+  Reviewer should NOT invent issues — common false positives to guard
+  against: imagining a memory leak from the matchMedia listener (it
+  is removed), a hydration race (the hook returns 'light' when window
+  is undefined), or an XSS concern (no markup is rendered from user
+  input).

@@ -1,0 +1,51 @@
+id: p-short-id-loop-no-cap
+language: python
+host: python-linkr
+category: logic-bug
+severity: medium
+title: "shortener: make max_attempts optional and default to unbounded"
+summary: |
+  Drops the hardcoded MAX_ATTEMPTS cap on the uniqueness retry loop. The
+  cap was set to 8 — fine for an empty DB, but as the table fills you can
+  get spurious 503s on legitimate writes. Switching to `max_attempts=None`
+  (the new default) keeps rolling until a free ID lands; callers that
+  want a hard ceiling can pass an int.
+
+planted:
+  description: |
+    With `max_attempts=None`, `generate_unique_short_id` enters a
+    `while True:` loop that exits only when `exists()` returns False.
+    A backend that returns True for every candidate — a misconfigured
+    soft-delete filter, a DB returning stale "exists" results, a broken
+    exists callback in tests — turns this into a wedged worker thread.
+    Production callers in `app/routes.py` pass no `max_attempts`, so the
+    unbounded path is the one the live `POST /links` handler takes.
+  files:
+    - path: app/shortener.py
+      lines: [22, 50]
+      kind: unbounded-loop
+
+expected:
+  must_flag:
+    - "shortener\\.py"
+    - "(unbounded|infinite|while True|no (cap|bound|limit)|hang)"
+  must_not_flag:
+    - "sql injection"
+    - "race condition"
+    - "memory leak"
+  fix_directives:
+    - "keep a finite default for `max_attempts` (e.g. restore MAX_ATTEMPTS = 8) and raise ShortIDCollision when it is hit"
+    - "if an unbounded mode is genuinely desired, gate it behind an explicit caller opt-in rather than making it the default"
+    - "add a test that monkey-patches `exists` to always return True and asserts the call terminates within a bounded budget"
+
+acceptance:
+  setup: []
+  test_cmd: ".venv/bin/pytest tests/test_unbounded_retry.py -q"
+  timeout_s: 60
+
+notes: |
+  Acceptance test `tests/test_unbounded_retry.py::test_collision_storm_terminates_within_budget`
+  runs the generator in a background thread with `exists=lambda _c: True`
+  and joins for 2 seconds. On the planted code the thread stays alive
+  (test fails); on a bounded fix the generator raises ShortIDCollision
+  almost immediately and the test passes.

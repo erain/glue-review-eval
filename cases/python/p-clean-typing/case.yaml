@@ -1,0 +1,38 @@
+id: p-clean-typing
+language: python
+host: python-linkr
+category: clean
+severity: none
+title: "routes: tighten type hints on build_router and _load_active_link"
+summary: |
+  Adds an explicit type annotation to `build_router`'s `get_db` parameter
+  (it was untyped) and pins the local `link` variable in
+  `_load_active_link` to `Link | None`. No behavior change; just helps
+  editors and type-checkers.
+
+planted:
+  description: ""
+  files: []
+
+expected:
+  must_flag:
+    - "(LGTM|looks good|no concerns|approved|approve|ship it|good to go)"
+  must_not_flag:
+    - "missing test"
+    - "breaking change"
+    - "unsafe"
+
+acceptance:
+  setup: []
+  test_cmd: ".venv/bin/pytest -q"
+  timeout_s: 60
+
+notes: |
+  Clean case. The diff is a no-op type-annotation tightening on
+  `app/routes.py`:
+    - `build_router(get_db)` -> `build_router(get_db: Callable[..., Iterator[Session]])`
+    - Add `link: Link | None = ...` to the lookup result.
+    - Add a one-line docstring to the private helper.
+  All 26 existing tests pass. The reviewer should approve, or at most
+  raise a stylistic nit, and must not invent bugs (no "missing test",
+  no "unsafe", no "breaking change").

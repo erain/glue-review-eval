@@ -1,0 +1,109 @@
+diff --git a/cmd/glog/last_test.go b/cmd/glog/last_test.go
+new file mode 100644
+index 0000000..9115402
+--- /dev/null
++++ b/cmd/glog/last_test.go
+@@ -0,0 +1,31 @@
++package main
++
++import (
++	"bytes"
++	"strings"
++	"testing"
++)
++
++func TestRun_LastReturnsExactlyN(t *testing.T) {
++	in := strings.NewReader(strings.Join([]string{
++		`{"level":"info","msg":"a"}`,
++		`{"level":"info","msg":"b"}`,
++		`{"level":"info","msg":"c"}`,
++		`{"level":"info","msg":"d"}`,
++		`{"level":"info","msg":"e"}`,
++	}, "\n") + "\n")
++	var out, errb bytes.Buffer
++	code := run([]string{"--last", "3"}, in, &out, &errb)
++	if code != 0 {
++		t.Fatalf("exit=%d stderr=%s", code, errb.String())
++	}
++	got := out.String()
++	n := strings.Count(got, "\n")
++	if n != 3 {
++		t.Fatalf("--last 3 expected 3 lines, got %d:\n%s", n, got)
++	}
++	// The last three must be c, d, e in order.
++	if !strings.Contains(got, "INFO c") || !strings.Contains(got, "INFO d") || !strings.Contains(got, "INFO e") {
++		t.Fatalf("--last 3 wrong window:\n%s", got)
++	}
++}
+diff --git a/cmd/glog/main.go b/cmd/glog/main.go
+index 095fd44..719fa3b 100644
+--- a/cmd/glog/main.go
++++ b/cmd/glog/main.go
+@@ -8,6 +8,7 @@ import (
+ 	"io"
+ 	"os"
+ 	"os/signal"
++	"strings"
+ 	"syscall"
+ 	"time"
+ 
+@@ -30,6 +31,7 @@ Flags:
+   --field   key=value exact match; repeatable
+   -f, --follow   tail the file as it grows
+   --out     plain|json (default plain)
++  --last N  print only the most recent N matched entries
+ `
+ 
+ // repeatable collects --field flag values. It satisfies flag.Value.
+@@ -46,6 +48,7 @@ type options struct {
+ 	fields repeatable
+ 	follow bool
+ 	out    string
++	last   int
+ }
+ 
+ func main() {
+@@ -66,6 +69,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+ 	fs.BoolVar(&opt.follow, "follow", false, "")
+ 	fs.BoolVar(&opt.follow, "f", false, "")
+ 	fs.StringVar(&opt.out, "out", "plain", "")
++	fs.IntVar(&opt.last, "last", 0, "")
+ 
+ 	if err := fs.Parse(args); err != nil {
+ 		return 2
+@@ -117,16 +121,35 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+ 	}
+ 	defer cleanup()
+ 
++	var buf []string
+ 	for line := range lines {
+ 		e := entry.Parse(line)
+ 		if !flt.Match(e) {
+ 			continue
+ 		}
++		if opt.last > 0 {
++			var b strings.Builder
++			if err := r.Render(&b, e); err != nil {
++				fmt.Fprintln(stderr, "glog:", err)
++				return 1
++			}
++			buf = append(buf, b.String())
++			continue
++		}
+ 		if err := r.Render(stdout, e); err != nil {
+ 			fmt.Fprintln(stderr, "glog:", err)
+ 			return 1
+ 		}
+ 	}
++	if opt.last > 0 && len(buf) > 0 {
++		start := len(buf) - opt.last - 1
++		if start < 0 {
++			start = 0
++		}
++		for _, s := range buf[start:] {
++			io.WriteString(stdout, s)
++		}
++	}
+ 	return 0
+ }
+ 

@@ -1,0 +1,45 @@
+id: p-doc-url-mismatch
+language: python
+host: python-linkr
+category: doc
+severity: low
+title: "docs: refresh README examples to use POST /shorten"
+summary: |
+  Updates the README's endpoint table and curl example to use
+  `POST /shorten` — clearer intent than the more generic `/links`.
+
+planted:
+  description: |
+    The README change advertises `POST /shorten` in both the Endpoints
+    table and the curl example. The actual route in `app/routes.py` is
+    still `POST /links` — there is no `/shorten` handler. The README
+    now contradicts the code; anyone copy-pasting the curl will get a
+    404 from FastAPI's default not-found handler.
+  files:
+    - path: README.md
+      lines: [36, 50]
+      kind: doc-code-mismatch
+
+expected:
+  must_flag:
+    - "README"
+    - "(/shorten|/links|mismatch|does not match|inconsisten|doesn'?t exist|no such (route|endpoint)|404)"
+  must_not_flag:
+    - "sql injection"
+    - "security"
+    - "race condition"
+  fix_directives:
+    - "revert the README examples to `POST /links` to match the route in app/routes.py, OR add a `/shorten` route (and tests) and keep the docs"
+    - "do not silently land docs that disagree with the code"
+
+acceptance:
+  setup: []
+  test_cmd: ".venv/bin/pytest -q"
+  timeout_s: 60
+
+notes: |
+  Pure documentation PR. No acceptance test for the bug itself — the
+  README either matches the code or it doesn't, and the existing test
+  suite must continue to pass (it does). The reviewer should flag the
+  README/code mismatch by name and propose either reverting the doc or
+  adding the missing route. They must not pivot to inventing code bugs.

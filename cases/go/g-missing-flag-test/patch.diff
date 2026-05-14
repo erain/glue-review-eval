@@ -1,0 +1,120 @@
+diff --git a/cmd/glog/main.go b/cmd/glog/main.go
+index 095fd44..552372a 100644
+--- a/cmd/glog/main.go
++++ b/cmd/glog/main.go
+@@ -30,6 +30,7 @@ Flags:
+   --field   key=value exact match; repeatable
+   -f, --follow   tail the file as it grows
+   --out     plain|json (default plain)
++  --quote   in plain output, always quote tail values (default false)
+ `
+ 
+ // repeatable collects --field flag values. It satisfies flag.Value.
+@@ -46,6 +47,7 @@ type options struct {
+ 	fields repeatable
+ 	follow bool
+ 	out    string
++	quote  bool
+ }
+ 
+ func main() {
+@@ -66,6 +68,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+ 	fs.BoolVar(&opt.follow, "follow", false, "")
+ 	fs.BoolVar(&opt.follow, "f", false, "")
+ 	fs.StringVar(&opt.out, "out", "plain", "")
++	fs.BoolVar(&opt.quote, "quote", false, "")
+ 
+ 	if err := fs.Parse(args); err != nil {
+ 		return 2
+@@ -93,6 +96,11 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+ 		fmt.Fprintln(stderr, "glog:", err)
+ 		return 2
+ 	}
++	// --quote only affects the default plain renderer; json is already
++	// fully quoted by definition.
++	if opt.quote && opt.out != "json" {
++		r = render.NewQuoted()
++	}
+ 
+ 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+ 	defer cancel()
+diff --git a/render/render.go b/render/render.go
+index 334d5bd..4926cec 100644
+--- a/render/render.go
++++ b/render/render.go
+@@ -30,6 +30,14 @@ func New(format string) (Renderer, error) {
+ 	}
+ }
+ 
++// NewQuoted returns a plain renderer that wraps every tail value in quotes,
++// regardless of whether the value contains whitespace. Useful when the
++// downstream consumer is a parser that splits on whitespace and would
++// otherwise mis-tokenise bare values.
++func NewQuoted() Renderer {
++	return plainQuoted{}
++}
++
+ type rawJSON struct{}
+ 
+ func (rawJSON) Render(w io.Writer, e entry.Entry) error {
+@@ -95,3 +103,60 @@ func quoteIfNeeded(s string) string {
+ 	}
+ 	return s
+ }
++
++type plainQuoted struct{}
++
++// Render mirrors plain.Render but always wraps tail values in quotes. A small
++// smoke check on a synthetic entry runs at init() time to catch obvious
++// regressions in the format string handling.
++func (plainQuoted) Render(w io.Writer, e entry.Entry) error {
++	if !e.Parsed {
++		_, err := io.WriteString(w, e.Raw+"\n")
++		return err
++	}
++
++	var b strings.Builder
++	if e.HasTS {
++		b.WriteString(e.TS.UTC().Format(time.RFC3339))
++		b.WriteByte(' ')
++	}
++	if e.Level != "" {
++		b.WriteString(strings.ToUpper(e.Level))
++		b.WriteByte(' ')
++	}
++	if e.Msg != "" {
++		b.WriteString(e.Msg)
++	}
++
++	keys := make([]string, 0, len(e.Fields))
++	for k := range e.Fields {
++		if _, skip := reservedKeys[k]; skip {
++			continue
++		}
++		keys = append(keys, k)
++	}
++	sort.Strings(keys)
++	for _, k := range keys {
++		v, _ := e.FieldString(k)
++		b.WriteByte(' ')
++		b.WriteString(k)
++		b.WriteByte('=')
++		b.WriteString(fmt.Sprintf("%q", v))
++	}
++	b.WriteByte('\n')
++	_, err := io.WriteString(w, b.String())
++	return err
++}
++
++// init smoke-checks the quoted renderer so a malformed format string is
++// caught at process start rather than mid-stream.
++func init() {
++	var b strings.Builder
++	e := entry.Entry{Parsed: true, Level: "info", Msg: "ok", Fields: map[string]any{"k": "v"}}
++	if err := (plainQuoted{}).Render(&b, e); err != nil {
++		panic("render: plainQuoted smoke check failed: " + err.Error())
++	}
++	if !strings.Contains(b.String(), `k="v"`) {
++		panic("render: plainQuoted smoke check produced unexpected output: " + b.String())
++	}
++}

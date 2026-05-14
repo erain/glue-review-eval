@@ -38,17 +38,53 @@ def _git(cwd: Path, *args: str, check: bool = True) -> subprocess.CompletedProce
     )
 
 
+# Mirror the excludes in tools/stage_case.sh so patches captured against a
+# stage match the runner's case repo. Anything build/runtime / virtualenv /
+# vendored stays out of the baseline.
+_HOST_COPY_EXCLUDES = {
+    ".venv", "__pycache__", "node_modules", "dist", ".next",
+    ".pytest_cache", "coverage",
+}
+_HOST_COPY_SUFFIX_EXCLUDES = (".pyc", ".pyo", ".db", ".db-journal")
+
+
+def _copy_ignore(_src, names):
+    out = set()
+    for n in names:
+        if n in _HOST_COPY_EXCLUDES or n.endswith(_HOST_COPY_SUFFIX_EXCLUDES):
+            out.add(n)
+    return out
+
+
+_GITIGNORE_BODY = """__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+*.db
+*.db-journal
+.venv/
+node_modules/
+dist/
+.next/
+coverage/
+"""
+
+
 def _prepare_case_repo(case: Case, tmpdir: Path) -> Path:
     host_src = PATHS.hosts / case.host
     if not host_src.exists():
         raise FileNotFoundError(f"host {case.host!r} missing at {host_src}")
     repo = tmpdir / case.host
-    shutil.copytree(host_src, repo)
+    shutil.copytree(host_src, repo, ignore=_copy_ignore)
     # Strip any stray .git from the host source (hosts are normal dirs, not repos).
     if (repo / ".git").exists():
         shutil.rmtree(repo / ".git")
 
     _git(repo, "init", "-q", "-b", "main")
+    # Commit a stage-time .gitignore so future runtime artefacts (test runs,
+    # SQLite DBs) don't show up in `git diff` and confuse glue-review's
+    # baseline comparison.
+    (repo / ".gitignore").write_text(_GITIGNORE_BODY)
     _git(repo, "add", "-A")
     _git(repo, "commit", "-q", "-m", "host baseline")
     _git(repo, "checkout", "-q", "-b", "feature")

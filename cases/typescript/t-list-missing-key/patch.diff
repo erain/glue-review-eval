@@ -1,0 +1,62 @@
+diff --git a/src/__tests__/NoteList.keys.test.tsx b/src/__tests__/NoteList.keys.test.tsx
+new file mode 100644
+index 0000000..21dd957
+--- /dev/null
++++ b/src/__tests__/NoteList.keys.test.tsx
+@@ -0,0 +1,40 @@
++import { render } from '@testing-library/react';
++import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
++import NoteList from '../components/NoteList';
++
++const notes = [
++  { id: 'a', body: '# Alpha', title: 'Alpha', createdAt: 1, updatedAt: 2 },
++  { id: 'b', body: 'Beta line', title: 'Beta line', createdAt: 3, updatedAt: 4 },
++  { id: 'c', body: 'Gamma', title: 'Gamma', createdAt: 5, updatedAt: 6 },
++];
++
++let errorSpy: ReturnType<typeof vi.spyOn>;
++
++beforeEach(() => {
++  errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
++});
++
++afterEach(() => {
++  errorSpy.mockRestore();
++});
++
++describe('NoteList list-item keys', () => {
++  it('does not emit a missing-key warning when rendering multiple notes', () => {
++    render(
++      <NoteList
++        notes={notes}
++        selectedId={null}
++        onSelect={() => {}}
++        onCreate={() => {}}
++        onDelete={() => {}}
++      />,
++    );
++
++    const keyWarnings = errorSpy.mock.calls.filter((call) => {
++      const msg = String(call[0] ?? '');
++      return /unique "key"|unique key|each child in a list/i.test(msg);
++    });
++
++    expect(keyWarnings).toHaveLength(0);
++  });
++});
+diff --git a/src/components/NoteList.tsx b/src/components/NoteList.tsx
+index e42f269..ddea5c0 100644
+--- a/src/components/NoteList.tsx
++++ b/src/components/NoteList.tsx
+@@ -38,8 +38,10 @@ export default function NoteList({
+         <ul className="note-list__items" role="listbox" aria-label="Note titles">
+           {notes.map((note) => {
+             const selected = note.id === selectedId;
++            // Notes are sorted by updatedAt desc upstream; no need for an
++            // explicit key when iteration is stable.
+             return (
+-              <li key={note.id}>
++              <li>
+                 <button
+                   type="button"
+                   role="option"

@@ -1,0 +1,48 @@
+id: g-doc-stale-flag
+language: go
+host: go-glog
+category: doc
+severity: low
+title: "README: rename --since/--until to --within/--before"
+summary: |
+  Updates the README usage example and the flag table to refer to
+  --within and --before, which read more naturally than --since and
+  --until for a duration-relative filter.
+
+planted:
+  description: |
+    The README is edited to mention `--within` and `--before` but no
+    code change accompanies it. `cmd/glog/main.go` still wires up only
+    `--since` and `--until`; the new names don't exist. Anyone copying
+    the example out of the README gets `flag provided but not defined`
+    and a non-zero exit. The PR is doc-only, so the divergence is
+    purely between the README and the actual CLI surface.
+  files:
+    - path: README.md
+      lines: [22, 58]
+      kind: doc-divergence
+
+expected:
+  must_flag:
+    - "README\\.md|README"
+    - "(--within|--before).*(does not exist|undefined|not implemented|not.{0,5}defined|no such flag|missing|absent)|(--since|--until).*(still|actual|implemented)"
+    - "(divergence|mismatch|inconsistent|out of sync|stale|doesn't match|don't match)"
+  must_not_flag:
+    - "race condition"
+    - "sql injection"
+    - "off-by-one"
+  fix_directives:
+    - "revert the README to `--since` and `--until` to match cmd/glog/main.go, OR add `--within` and `--before` as aliases in main.go (and update the help text accordingly)"
+    - "verify by running `glog --within 15m` against the built binary; it should not exit with `flag provided but not defined`"
+
+acceptance:
+  setup: []
+  test_cmd: "grep -q -- '--since' README.md && grep -q -- '--until' README.md"
+  timeout_s: 30
+
+notes: |
+  Acceptance is a grep: the README must mention `--since` and `--until`
+  again (the simplest fix is a revert). An alternate fix — adding
+  --within/--before aliases in main.go — would also satisfy a more
+  thorough reviewer, but the grep acceptance only checks the doc side
+  to keep the gate deterministic.

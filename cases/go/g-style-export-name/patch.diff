@@ -1,0 +1,16 @@
+diff --git a/filter/filter.go b/filter/filter.go
+index cc475b9..daa107e 100644
+--- a/filter/filter.go
++++ b/filter/filter.go
+@@ -116,3 +116,11 @@ func (f *Filter) Match(e entry.Entry) bool {
+ type fieldErr struct{ raw string }
+ 
+ func (e *fieldErr) Error() string { return "field filter must be key=value: " + e.raw }
++
++// Filtermatch is a package-level convenience wrapper around (*Filter).Match
++// for callers that already have a constructed Filter and a parsed entry and
++// don't want to bother with the method-call syntax. It's exported so external
++// pipelines can plug it into a functional-style higher-order helper.
++func Filtermatch(f *Filter, e entry.Entry) bool {
++	return f.Match(e)
++}

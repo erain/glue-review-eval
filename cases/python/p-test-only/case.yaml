@@ -1,0 +1,37 @@
+id: p-test-only
+language: python
+host: python-linkr
+category: test-only
+severity: none
+title: "tests: cover /healthz response shape and idempotence"
+summary: |
+  Adds four small tests that pin down the `/healthz` JSON contract:
+  content-type is `application/json`, the body has exactly a `status`
+  key whose value is `"ok"`, and successive calls return identical
+  bodies. No production-code changes — just locking down the shape so
+  future refactors can't drift the response silently.
+
+planted:
+  description: ""
+  files: []
+
+expected:
+  must_flag:
+    - "(LGTM|looks good|no concerns|approved|approve|ship it|good to go|nice coverage|good additions)"
+  must_not_flag:
+    - "breaking change"
+    - "unsafe"
+    - "regression"
+
+acceptance:
+  setup: []
+  test_cmd: ".venv/bin/pytest -q"
+  timeout_s: 60
+
+notes: |
+  Test-only PR — no code under `app/` changes. 26 existing tests plus
+  the 4 new tests in `tests/test_health_shape.py` all pass (30 total).
+  The reviewer should approve, or at most raise a stylistic nit, and
+  must not invent a bug. `must_not_flag` catches the typical drift
+  modes for new tests: claiming they encode a regression or that they
+  introduce some kind of unsafe behaviour.

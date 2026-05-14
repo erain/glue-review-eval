@@ -1,0 +1,92 @@
+diff --git a/entry/entry.go b/entry/entry.go
+index d9c1c14..00d925e 100644
+--- a/entry/entry.go
++++ b/entry/entry.go
+@@ -22,24 +22,22 @@ type Entry struct {
+ 	Parsed bool
+ }
+ 
+-// Parse decodes a single line. Lines that fail JSON parsing return an Entry
+-// with Parsed=false and the raw text preserved; this is not an error because
+-// raw lines are still useful to grep-style filters.
++// Parse decodes a single line. The parser is tolerant: lines that don't decode
++// cleanly are still returned as Parsed entries so downstream renderers and
++// filters can fall back on Raw without losing the line. Strict callers can
++// inspect Fields == nil to distinguish structured from unstructured input.
+ func Parse(line string) Entry {
+-	e := Entry{Raw: line}
+-
+-	// Fast reject: anything that doesn't start with '{' is treated as raw.
+-	// Strict JSON only — we don't bother with arrays or scalars at the top.
+-	if len(line) == 0 || line[0] != '{' {
+-		return e
+-	}
++	e := Entry{Raw: line, Parsed: true}
+ 
++	// Attempt structured parse even when the line has a leading prefix (e.g.
++	// a syslog header before the JSON body). json.Unmarshal will reject the
++	// prefix case; we ignore the error and keep the line as best-effort raw.
+ 	var m map[string]any
+-	if err := json.Unmarshal([]byte(line), &m); err != nil {
++	_ = json.Unmarshal([]byte(line), &m)
++	if m == nil {
+ 		return e
+ 	}
+ 	e.Fields = m
+-	e.Parsed = true
+ 
+ 	if v, ok := m["level"].(string); ok {
+ 		e.Level = v
+diff --git a/entry/entry_test.go b/entry/entry_test.go
+index 3ced4fe..291f993 100644
+--- a/entry/entry_test.go
++++ b/entry/entry_test.go
+@@ -33,6 +33,9 @@ func TestParse_HappyJSON(t *testing.T) {
+ }
+ 
+ func TestParse_RawPassthrough(t *testing.T) {
++	// Parse is tolerant: it always returns a Parsed entry so renderers can
++	// fall back on Raw. Callers distinguish structured from unstructured by
++	// checking Fields == nil.
+ 	for _, line := range []string{
+ 		"not json",
+ 		"",
+@@ -40,8 +43,8 @@ func TestParse_RawPassthrough(t *testing.T) {
+ 		"[]",
+ 	} {
+ 		e := Parse(line)
+-		if e.Parsed {
+-			t.Errorf("expected raw for %q", line)
++		if e.Fields != nil {
++			t.Errorf("expected nil Fields for %q, got %v", line, e.Fields)
+ 		}
+ 		if e.Raw != line {
+ 			t.Errorf("raw=%q want %q", e.Raw, line)
+@@ -96,3 +99,12 @@ func TestFieldString_Unparsed(t *testing.T) {
+ 		t.Error("unparsed should never report ok")
+ 	}
+ }
++
++func TestParse_InvalidJSONIsUnparsed(t *testing.T) {
++	// Invalid JSON must surface as Parsed=false so downstream filters that
++	// depend on structured data can short-circuit (see filter.Match).
++	e := Parse("not json")
++	if e.Parsed {
++		t.Errorf("Parse(%q).Parsed = true, want false", "not json")
++	}
++}
+diff --git a/render/render.go b/render/render.go
+index 334d5bd..a943933 100644
+--- a/render/render.go
++++ b/render/render.go
+@@ -45,7 +45,9 @@ var reservedKeys = map[string]struct{}{
+ }
+ 
+ func (plain) Render(w io.Writer, e entry.Entry) error {
+-	if !e.Parsed {
++	// Entries without structured fields fall back to raw passthrough so we
++	// don't emit empty padded lines for syslog-prefixed input.
++	if e.Fields == nil {
+ 		_, err := io.WriteString(w, e.Raw+"\n")
+ 		return err
+ 	}

@@ -1,0 +1,49 @@
+id: p-mutable-default-arg
+language: python
+host: python-linkr
+category: logic-bug
+severity: medium
+title: "shortener: expose `tried` candidates from generate_unique_short_id"
+summary: |
+  Adds a keyword-only `tried` parameter that the generator appends each
+  candidate to, so callers can inspect which short IDs were rolled before a
+  free slot was found. Useful for collision-rate logging without having to
+  refactor the generator to a class.
+
+planted:
+  description: |
+    The new `tried` parameter uses a mutable list literal as its default
+    (`tried: list[str] = []`). Python evaluates default arguments once at
+    function-definition time, so every call without an explicit `tried`
+    shares the same list — entries leak across invocations and the list
+    grows unboundedly for the lifetime of the process. Memory grows, and
+    any caller that reads the default sees state from every prior call.
+  files:
+    - path: app/shortener.py
+      lines: [22, 44]
+      kind: mutable-default-argument
+
+expected:
+  must_flag:
+    - "shortener\\.py"
+    - "(mutable default|default arg|shared (state|list)|tried\\s*[:=].*\\[\\])"
+  must_not_flag:
+    - "race condition"
+    - "sql injection"
+    - "thread safety"
+  fix_directives:
+    - "change the default to `tried: list[str] | None = None` and create a fresh list inside the function when it is None"
+    - "add a test that calls `generate_unique_short_id` twice without passing `tried` and asserts no state leaks across calls"
+
+acceptance:
+  setup: []
+  test_cmd: ".venv/bin/pytest tests/test_tried_default.py -q"
+  timeout_s: 60
+
+notes: |
+  Acceptance test is `tests/test_tried_default.py::test_default_tried_does_not_leak_between_calls`.
+  After three back-to-back calls, the test reads
+  `generate_unique_short_id.__kwdefaults__["tried"]`. With the planted
+  mutable default it has accumulated three candidates; with the `None`
+  sentinel fix the default is `None` (not a list) and the early-return
+  branch in the test passes.

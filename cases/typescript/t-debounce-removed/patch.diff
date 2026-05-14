@@ -1,0 +1,115 @@
+diff --git a/src/__tests__/persistence-debounce.test.ts b/src/__tests__/persistence-debounce.test.ts
+new file mode 100644
+index 0000000..37081a5
+--- /dev/null
++++ b/src/__tests__/persistence-debounce.test.ts
+@@ -0,0 +1,38 @@
++import { act, renderHook } from '@testing-library/react';
++import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
++import { useNotes } from '../hooks/useNotes';
++
++beforeEach(() => {
++  localStorage.clear();
++  vi.useFakeTimers();
++});
++
++afterEach(() => {
++  vi.useRealTimers();
++});
++
++describe('persistence debounce', () => {
++  it('coalesces a burst of edits into at most a handful of localStorage writes', () => {
++    const { result } = renderHook(() => useNotes());
++    let id = '';
++    act(() => {
++      id = result.current.createNote().id;
++    });
++
++    const spy = vi.spyOn(Storage.prototype, 'setItem');
++
++    // Simulate 10 rapid keystrokes — each is its own React commit, the way
++    // an onChange handler fires per keypress in the running app.
++    for (let i = 0; i < 10; i++) {
++      act(() => {
++        result.current.updateBody(id, `edit-${i}`);
++      });
++    }
++
++    // With a debounced persistence layer the burst should collapse into at
++    // most two writes within a single tick (the timer hasn't fired yet).
++    expect(spy.mock.calls.length).toBeLessThanOrEqual(2);
++
++    spy.mockRestore();
++  });
++});
+diff --git a/src/__tests__/useNotes.test.ts b/src/__tests__/useNotes.test.ts
+index f1db22f..14c7295 100644
+--- a/src/__tests__/useNotes.test.ts
++++ b/src/__tests__/useNotes.test.ts
+@@ -124,26 +124,20 @@ describe('useNotes', () => {
+     expect(result.current.selectedId).toBe(before);
+   });
+ 
+-  it('persists to localStorage after the debounce window', () => {
++  it('persists to localStorage after a state change', () => {
+     const { result } = renderHook(() => useNotes());
+     act(() => {
+       result.current.createNote();
+     });
+-    // Right after creation — nothing yet.
+-    expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
+-    act(() => {
+-      vi.advanceTimersByTime(350);
+-    });
+     const persisted = loadState(localStorage);
+     expect(persisted.notes).toHaveLength(1);
+   });
+ 
+-  it('flush writes immediately without waiting for the debounce', () => {
++  it('flush writes immediately', () => {
+     const { result } = renderHook(() => useNotes());
+     act(() => {
+       result.current.createNote();
+     });
+-    expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
+     act(() => {
+       result.current.flush();
+     });
+diff --git a/src/hooks/useNotes.ts b/src/hooks/useNotes.ts
+index 69c86ab..19f6219 100644
+--- a/src/hooks/useNotes.ts
++++ b/src/hooks/useNotes.ts
+@@ -1,11 +1,8 @@
+-/** Note CRUD + selection state with debounced localStorage persistence. */
++/** Note CRUD + selection state with localStorage persistence. */
+ 
+-import { useCallback, useMemo, useState } from 'react';
++import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+ import { loadState, saveState, type StoredState } from '../storage';
+ import { newNote, titleOf, type Note } from '../types';
+-import { useDebouncedEffect } from './useDebounce';
+-
+-const PERSIST_DELAY_MS = 300;
+ 
+ export interface UseNotesApi {
+   notes: Note[];
+@@ -24,8 +21,18 @@ export interface UseNotesApi {
+ /** Stateful hook backing the whole app. Single source of truth for notes. */
+ export function useNotes(): UseNotesApi {
+   const [state, setState] = useState<StoredState>(() => loadState());
++  const stateRef = useRef(state);
++  stateRef.current = state;
++
++  // Remove debounce; localStorage writes are fast and the extra timer just
++  // delays the "saved" indicator. Persist on every state change.
++  useEffect(() => {
++    saveState(state);
++  }, [state]);
+ 
+-  const flush = useDebouncedEffect(state, PERSIST_DELAY_MS, saveState);
++  const flush = useCallback(() => {
++    saveState(stateRef.current);
++  }, []);
+ 
+   const createNote = useCallback((): Note => {
+     const note = newNote();

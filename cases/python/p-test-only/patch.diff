@@ -1,0 +1,43 @@
+diff --git a/tests/test_health_shape.py b/tests/test_health_shape.py
+new file mode 100644
+index 0000000..2a859d8
+--- /dev/null
++++ b/tests/test_health_shape.py
+@@ -0,0 +1,37 @@
++"""Additional coverage for the `/healthz` response shape.
++
++`test_health.py` already covers status-code + status field; these tests
++pin down the JSON shape itself (single `status` field, value `"ok"`,
++content-type) so future changes that subtly alter the response are
++caught at the contract layer.
++"""
++
++from __future__ import annotations
++
++
++def test_health_returns_json_content_type(client):
++    r = client.get("/healthz")
++    assert r.status_code == 200
++    ct = r.headers.get("content-type", "")
++    assert ct.startswith("application/json"), ct
++
++
++def test_health_body_has_exactly_status_field(client):
++    r = client.get("/healthz")
++    body = r.json()
++    assert set(body.keys()) == {"status"}, (
++        f"unexpected fields on /healthz response: {sorted(body.keys())}"
++    )
++
++
++def test_health_status_value_is_ok(client):
++    r = client.get("/healthz")
++    assert r.json()["status"] == "ok"
++
++
++def test_health_is_idempotent(client):
++    # Two calls in a row should return the same body — `/healthz` has no
++    # per-request state.
++    first = client.get("/healthz").json()
++    second = client.get("/healthz").json()
++    assert first == second

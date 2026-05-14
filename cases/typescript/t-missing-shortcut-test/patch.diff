@@ -1,0 +1,85 @@
+diff --git a/src/App.tsx b/src/App.tsx
+index d60325e..e64f934 100644
+--- a/src/App.tsx
++++ b/src/App.tsx
+@@ -1,10 +1,10 @@
+ /** Top-level layout: sidebar + editor + preview, plus global keyboard shortcuts. */
+ 
+-import { useEffect } from 'react';
+ import NoteList from './components/NoteList';
+ import Editor from './components/Editor';
+ import Preview from './components/Preview';
+ import { useNotes } from './hooks/useNotes';
++import { useShortcuts } from './hooks/useShortcuts';
+ import './App.css';
+ 
+ export default function App() {
+@@ -19,24 +19,7 @@ export default function App() {
+     flush,
+   } = useNotes();
+ 
+-  useEffect(() => {
+-    function onKey(e: KeyboardEvent) {
+-      const mod = e.metaKey || e.ctrlKey;
+-      if (!mod) return;
+-      const key = e.key.toLowerCase();
+-      if (key === 'n') {
+-        e.preventDefault();
+-        createNote();
+-      } else if (key === 's') {
+-        // Autosave already runs on a debounce; this just flushes the pending
+-        // write so the user sees the "saved" effect immediately.
+-        e.preventDefault();
+-        flush();
+-      }
+-    }
+-    window.addEventListener('keydown', onKey);
+-    return () => window.removeEventListener('keydown', onKey);
+-  }, [createNote, flush]);
++  useShortcuts({ onNewNote: createNote, onSave: flush });
+ 
+   return (
+     <div className="app">
+diff --git a/src/hooks/useShortcuts.ts b/src/hooks/useShortcuts.ts
+new file mode 100644
+index 0000000..8b9e0e5
+--- /dev/null
++++ b/src/hooks/useShortcuts.ts
+@@ -0,0 +1,37 @@
++/** Global keyboard shortcuts for the app shell. */
++
++import { useEffect } from 'react';
++
++export interface ShortcutHandlers {
++  /** Cmd/Ctrl+N — create a new note. */
++  onNewNote: () => void;
++  /** Cmd/Ctrl+S — force-flush pending persistence. */
++  onSave: () => void;
++}
++
++/**
++ * Bind app-level keyboard shortcuts to the window.
++ *
++ * Currently:
++ *   - Cmd/Ctrl+N: create a new note and select it.
++ *   - Cmd/Ctrl+S: flush the pending autosave write so the "saved" UX is
++ *     immediate even though the underlying persistence is debounced.
++ */
++export function useShortcuts({ onNewNote, onSave }: ShortcutHandlers): void {
++  useEffect(() => {
++    function onKey(e: KeyboardEvent) {
++      const mod = e.metaKey || e.ctrlKey;
++      if (!mod) return;
++      const key = e.key.toLowerCase();
++      if (key === 'n') {
++        e.preventDefault();
++        onNewNote();
++      } else if (key === 's') {
++        e.preventDefault();
++        onSave();
++      }
++    }
++    window.addEventListener('keydown', onKey);
++    return () => window.removeEventListener('keydown', onKey);
++  }, [onNewNote, onSave]);
++}

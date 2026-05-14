@@ -1,0 +1,33 @@
+diff --git a/app/routes.py b/app/routes.py
+index 797c2ad..c92dcfc 100644
+--- a/app/routes.py
++++ b/app/routes.py
+@@ -2,6 +2,8 @@
+ 
+ from __future__ import annotations
+ 
++from typing import Callable, Iterator
++
+ from fastapi import APIRouter, Depends, HTTPException, status
+ from fastapi.responses import RedirectResponse
+ from sqlalchemy import select
+@@ -13,7 +15,7 @@ from app.schemas import Health, LinkCreate, LinkCreated, LinkDetail
+ from app.shortener import ShortIDCollision, generate_unique_short_id
+ 
+ 
+-def build_router(get_db) -> APIRouter:
++def build_router(get_db: Callable[..., Iterator[Session]]) -> APIRouter:
+     """Create an APIRouter wired to the given DB-session dependency."""
+     router = APIRouter()
+ 
+@@ -79,8 +81,9 @@ def build_router(get_db) -> APIRouter:
+ 
+ 
+ def _load_active_link(db: Session, short_id: str) -> Link:
++    """Look up a non-deleted Link by short_id or raise 404."""
+     stmt = select(Link).where(Link.short_id == short_id, Link.deleted_at.is_(None))
+-    link = db.execute(stmt).scalar_one_or_none()
++    link: Link | None = db.execute(stmt).scalar_one_or_none()
+     if link is None:
+         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="not found")
+     return link

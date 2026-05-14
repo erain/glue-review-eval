@@ -1,0 +1,53 @@
+id: t-any-types-creep
+language: typescript
+host: ts-notepad
+category: style
+severity: low
+title: "storage/useNotes: relax types where they were in the way"
+summary: |
+  Replaces a handful of `unknown`/`string` signatures with `any` in
+  `storage.ts` and `useNotes.ts` so callsites don't have to keep
+  narrowing. Tests still pass and `tsc -b` is clean.
+
+planted:
+  description: |
+    Three separate spots replace precise types with `any`:
+      1. `saveState(state: any, ...)` in `src/storage.ts` — was
+         `StoredState`. The function then proceeds to JSON.stringify
+         whatever it's handed, defeating the only contract callers
+         had.
+      2. `normalize(value: any)` plus a `notes.some((n: any) => ...)`
+         in the same file — was `unknown` with an explicit
+         `Record<string, unknown>` narrowing.
+      3. `updateBody(id: string, body: any)` in
+         `src/hooks/useNotes.ts` (signature, interface field, and the
+         `prev.notes.map((n: any) => ...)` callback) — was `string`.
+    Each change is harmless in isolation; together they erode the
+    type-safety of the store boundary, which is the one place that
+    actually validates persisted shape.
+  files:
+    - path: src/storage.ts
+      lines: [45, 75]
+      kind: any-creep
+    - path: src/hooks/useNotes.ts
+      lines: [18, 60]
+      kind: any-creep
+
+expected:
+  must_flag:
+    - "(src/storage\\.ts|src/hooks/useNotes\\.ts|storage\\.ts|useNotes\\.ts)"
+    - "\\bany\\b"
+  must_not_flag:
+    - "runtime error"
+    - "memory leak"
+    - "xss"
+  fix_directives:
+    - "restore `state: StoredState` on saveState"
+    - "restore `value: unknown` on normalize and keep the Record<string, unknown> narrowing"
+    - "restore `body: string` on updateBody (signature, UseNotesApi field, and the map callback)"
+
+notes: |
+  Tests still pass and `tsc -b --noEmit` is clean — `any` does not
+  cause a type error, that is the point. Reviewer should flag the
+  three sites and direct the fix block to restore the original
+  signatures rather than papering over with new casts.

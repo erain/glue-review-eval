@@ -1,0 +1,24 @@
+diff --git a/README.md b/README.md
+index 6069b23..3e6f93e 100644
+--- a/README.md
++++ b/README.md
+@@ -24,7 +24,7 @@ go build ./cmd/glog
+ Tail a service log, errors only, last 15 minutes:
+ 
+ ```
+-glog --level error --since 15m -f /var/log/app.json
++glog --level error --within 15m -f /var/log/app.json
+ ```
+ 
+ All entries for user `alice` containing the word `retry`:
+@@ -50,8 +50,8 @@ my-service 2>&1 | glog --level info
+ | Flag        | What it does                                            |
+ | ----------- | ------------------------------------------------------- |
+ | `--level`   | Comma-separated allow-list. Case-insensitive.           |
+-| `--since`   | Keep entries no older than this duration (e.g. `15m`).  |
+-| `--until`   | Keep entries at least this old (e.g. `5m`).             |
++| `--within`  | Keep entries no older than this duration (e.g. `15m`).  |
++| `--before`  | Keep entries at least this old (e.g. `5m`).             |
+ | `--grep`    | Go regex matched against the raw line.                  |
+ | `--field`   | `key=value` exact match. Repeatable.                    |
+ | `-f`, `--follow` | Tail the file as it grows. Requires a file path.   |

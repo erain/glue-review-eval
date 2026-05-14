@@ -11,10 +11,10 @@
 # baseline so the captured patch.diff contains only the case's edits.
 set -euo pipefail
 
-host="${1:?usage: stage_case.sh <host-dir>}"
+host="${1:?usage: stage_case.sh <host-dir> [stage-dir]}"
 repo_root="$(cd "$(dirname "$0")/.." && pwd)"
 src="$repo_root/hosts/$host"
-stage=/tmp/case-stage
+stage="${2:-${STAGE_DIR:-/tmp/case-stage}}"
 
 if [[ ! -d "$src" ]]; then
   echo "no such host: $src" >&2
@@ -39,6 +39,23 @@ rsync -a --delete \
 
 cd "$stage"
 git init -q -b main
+
+# Gitignore stage-runtime artefacts so they don't appear in captured diffs.
+# (Stage-side; not committed back to the host project.)
+cat > .gitignore <<'GIT_IGNORE'
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+*.db
+*.db-journal
+.venv/
+node_modules/
+dist/
+.next/
+coverage/
+GIT_IGNORE
+
 git -c user.email=eval@x -c user.name=eval add -A
 git -c user.email=eval@x -c user.name=eval commit -q -m "host baseline ($host)"
 

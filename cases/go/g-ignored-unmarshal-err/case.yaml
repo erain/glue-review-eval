@@ -1,0 +1,58 @@
+id: g-ignored-unmarshal-err
+language: go
+host: go-glog
+category: logic-bug
+severity: medium
+title: "entry: tolerant Parse for prefixed log lines"
+summary: |
+  Reworks entry.Parse to be tolerant of lines that don't decode cleanly so
+  renderers can still fall back to Raw (the motivating case is syslog-style
+  prefixes ahead of the JSON body). Existing TestParse_RawPassthrough was
+  updated to assert Fields == nil instead of Parsed == false. A plain-render
+  follow-up uses Fields == nil for the raw fallback.
+
+planted:
+  description: |
+    Parse now ignores the json.Unmarshal error and sets Parsed=true
+    unconditionally. Downstream filter.Match short-circuits on !e.Parsed
+    when a level/field/time predicate is active, so invalid JSON lines that
+    used to be rejected by --level or --field now silently fall through
+    the structured-required guard (and only get rejected because Level/HasTS
+    happen to be zero values). Any future caller that trusts Parsed as a
+    "this decoded cleanly" flag — including tests, custom renderers, and
+    anything that branches on Parsed alone — is now wrong. The existing
+    TestParse_RawPassthrough was edited to mask the regression by checking
+    Fields == nil instead of the original Parsed == false contract.
+  files:
+    - path: entry/entry.go
+      lines: [25, 45]
+      kind: ignored-error
+    - path: entry/entry_test.go
+      lines: [35, 53]
+      kind: weakened-test
+
+expected:
+  must_flag:
+    - "entry/entry\\.go|entry\\.go"
+    - "(ignored|swallow|discard).{0,30}(error|err|unmarshal)|_ = json\\.Unmarshal|json\\.Unmarshal.*_"
+    - "Parsed"
+  must_not_flag:
+    - "race condition"
+    - "memory leak"
+    - "sql injection"
+  fix_directives:
+    - "restore the early return on json.Unmarshal error so Parsed remains false for invalid JSON"
+    - "revert TestParse_RawPassthrough to assert Parsed == false rather than Fields == nil"
+    - "keep TestParse_InvalidJSONIsUnparsed as a regression guard"
+
+acceptance:
+  setup: []
+  test_cmd: "go test ./entry/ -run TestParse_InvalidJSONIsUnparsed"
+  timeout_s: 60
+
+notes: |
+  Acceptance is TestParse_InvalidJSONIsUnparsed: Parse("not json") must
+  report Parsed=false. The buggy code returns Parsed=true. The fix is a
+  3-line revert (re-add the early returns and propagate the Unmarshal
+  error). TestParse_RawPassthrough should also be restored to its
+  original Parsed-checking form so the contract is properly defended.

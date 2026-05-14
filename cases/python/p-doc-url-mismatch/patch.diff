@@ -1,0 +1,22 @@
+diff --git a/README.md b/README.md
+index c0ec39b..517c2e3 100644
+--- a/README.md
++++ b/README.md
+@@ -33,7 +33,7 @@ require a key.
+ ## Endpoints
+ 
+ ```text
+-POST   /links              create a short link        (auth)
++POST   /shorten            create a short link        (auth)
+ GET    /links/{short_id}   metadata + hit count       (auth)
+ DELETE /links/{short_id}   soft-delete                (auth)
+ GET    /{short_id}         302 redirect, ++hits
+@@ -43,7 +43,7 @@ GET    /healthz            liveness
+ ## Examples
+ 
+ ```bash
+-curl -sX POST http://localhost:8000/links \
++curl -sX POST http://localhost:8000/shorten \
+   -H "X-API-Key: $LINKR_API_KEY" \
+   -H "Content-Type: application/json" \
+   -d '{"url":"https://anthropic.com"}'

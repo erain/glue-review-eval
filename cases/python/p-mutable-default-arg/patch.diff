@@ -1,0 +1,69 @@
+diff --git a/app/shortener.py b/app/shortener.py
+index 8fa2e0f..e0854b9 100644
+--- a/app/shortener.py
++++ b/app/shortener.py
+@@ -24,14 +24,20 @@ def generate_unique_short_id(
+     *,
+     length: int = SHORT_ID_LEN,
+     max_attempts: int = MAX_ATTEMPTS,
++    tried: list[str] = [],
+ ) -> str:
+     """Generate a short ID that passes `exists(...)` returning False.
+ 
+     `exists` is called with each candidate; returning True means the candidate
+     is taken. Raises ShortIDCollision after `max_attempts` consecutive hits.
++
++    The `tried` list is appended to with every candidate examined so callers
++    can introspect collisions after the fact; pass your own list to capture
++    just this call's attempts.
+     """
+     for _ in range(max_attempts):
+         candidate = random_short_id(length)
++        tried.append(candidate)
+         if not exists(candidate):
+             return candidate
+     raise ShortIDCollision(f"could not find a free short id in {max_attempts} attempts")
+diff --git a/tests/test_tried_default.py b/tests/test_tried_default.py
+new file mode 100644
+index 0000000..91fcac1
+--- /dev/null
++++ b/tests/test_tried_default.py
+@@ -0,0 +1,38 @@
++"""Tests for the new `tried` default-argument behaviour in
++`generate_unique_short_id`.
++
++Each call without an explicit `tried` list should start fresh — the default
++must not carry attempts across calls.
++"""
++
++from __future__ import annotations
++
++from app.shortener import generate_unique_short_id
++
++
++def _always_free(_c: str) -> bool:
++    return False
++
++
++def test_default_tried_does_not_leak_between_calls():
++    # Call once without passing `tried`. If `tried`'s default is a
++    # function-level mutable list, this call mutates that shared list.
++    generate_unique_short_id(_always_free)
++    generate_unique_short_id(_always_free)
++    generate_unique_short_id(_always_free)
++
++    # Now inspect the function's keyword default. With the buggy
++    # `tried: list[str] = []`, the default object has accumulated entries
++    # from every prior call. A correct implementation either uses a None
++    # sentinel (default is None) or never mutates a shared default.
++    kwdefaults = generate_unique_short_id.__kwdefaults__ or {}
++    default_tried = kwdefaults.get("tried")
++
++    if isinstance(default_tried, list):
++        assert default_tried == [], (
++            "the `tried` keyword default is a list and has accumulated "
++            f"state across calls: {default_tried!r}. Use a None sentinel "
++            "and create a fresh list inside the function instead."
++        )
++    # If the default is None or some other non-list sentinel, there is
++    # nothing to leak — that is the correct shape.

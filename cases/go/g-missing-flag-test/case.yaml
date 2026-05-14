@@ -1,0 +1,60 @@
+id: g-missing-flag-test
+language: go
+host: go-glog
+category: missing-test
+severity: medium
+title: "render: --quote always-quote plain renderer"
+summary: |
+  Adds a --quote flag and a new plainQuoted Renderer that wraps every
+  tail value in quotes (useful when piping plain output into a
+  whitespace-splitting consumer). A small init() smoke check guards
+  the format string.
+
+planted:
+  description: |
+    The new plainQuoted renderer and the --quote CLI plumbing are
+    implemented but ship with no real test. The only verification is an
+    init()-time smoke check on a single synthetic entry — that's a
+    "did it explode at startup" canary, not a behavioural test. None of
+    the obvious cases are covered: empty values (does %q still produce
+    ""?), values that contain quote characters (escaping), reserved-key
+    filtering, sort order, the --quote flag wiring in cmd/glog, or the
+    interaction with --out=json (which the implementation silently
+    suppresses). A reviewer should ask for a render_test.go entry
+    exercising plainQuoted directly and a cmd/glog test that drives
+    --quote end-to-end.
+  files:
+    - path: render/render.go
+      lines: [33, 41]
+      kind: missing-test
+    - path: render/render.go
+      lines: [115, 175]
+      kind: missing-test
+    - path: cmd/glog/main.go
+      lines: [78, 96]
+      kind: missing-test
+
+expected:
+  must_flag:
+    - "(render/render\\.go|render\\.go|cmd/glog|main\\.go)"
+    - "(missing|no|add).{0,30}(test|coverage)"
+    - "(--quote|plainQuoted|NewQuoted|quote)"
+  must_not_flag:
+    - "race condition"
+    - "memory leak"
+    - "sql injection"
+  fix_directives:
+    - "add a render_test.go case that constructs plainQuoted directly and asserts tail values are always quoted, including empty strings and values containing quote characters"
+    - "add a cmd/glog test that runs `run([]string{\"--quote\"}, ...)` against a structured entry and asserts the output is quoted"
+    - "drop the init() smoke check once the unit tests exist — init-time assertions are a poor substitute for go test"
+
+acceptance:
+  setup: []
+  test_cmd: "go test ./render/ -run TestPlainQuoted && go test ./cmd/glog/ -run TestRun_Quote"
+  timeout_s: 60
+
+notes: |
+  Acceptance requires the fix to add both a render-level test
+  (TestPlainQuoted*) and a CLI-level test (TestRun_Quote*). Existing
+  tests still pass on the planted diff — the gap is the absence of new
+  ones, which the reviewer must flag.

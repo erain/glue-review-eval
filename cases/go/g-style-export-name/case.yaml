@@ -1,0 +1,46 @@
+id: g-style-export-name
+language: go
+host: go-glog
+category: style
+severity: low
+title: "filter: add Filtermatch convenience wrapper"
+summary: |
+  Adds an exported package-level helper Filtermatch(f, e) so external
+  pipelines can pass filter matching as a value to higher-order helpers
+  without reaching for the method-value syntax.
+
+planted:
+  description: |
+    The new exported helper is named `Filtermatch` — capital F, lowercase
+    `m`. Go convention for multi-word exported identifiers is mixed-case
+    (MixedCaps / CamelCase), so the name should be `FilterMatch` (or, given
+    the package is already `filter`, plain `Match` would also be more
+    idiomatic). The function body is correct; this is a pure naming nit.
+  files:
+    - path: filter/filter.go
+      lines: [120, 127]
+      kind: exported-name-casing
+
+expected:
+  must_flag:
+    - "filter/filter\\.go|filter\\.go"
+    - "(naming|name|camel|mixed[ -]?caps|capitali[sz]ation|convention).*(Filtermatch|export)"
+    - "Filtermatch|FilterMatch"
+  must_not_flag:
+    - "race condition"
+    - "deadlock"
+    - "nil pointer"
+  fix_directives:
+    - "rename Filtermatch to FilterMatch (mixed-case) or drop it in favour of (*Filter).Match"
+    - "no behaviour change required; this is a pure rename"
+
+acceptance:
+  setup: []
+  test_cmd: "go vet ./filter/... && go build ./..."
+  timeout_s: 60
+
+notes: |
+  Style-only case — no failing test is planted. Acceptance just requires
+  the package still builds and vets cleanly after the fix (e.g. after a
+  rename to FilterMatch). The reviewer should flag the casing without
+  inventing a behavioural bug.

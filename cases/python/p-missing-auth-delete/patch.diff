@@ -1,0 +1,70 @@
+diff --git a/.venv b/.venv
+new file mode 120000
+index 0000000..138264a
+--- /dev/null
++++ b/.venv
+@@ -0,0 +1 @@
++/home/ubuntu/src/glue-review-eval/hosts/python-linkr/.venv
+\ No newline at end of file
+diff --git a/app/routes.py b/app/routes.py
+index 797c2ad..8b90fd0 100644
+--- a/app/routes.py
++++ b/app/routes.py
+@@ -68,6 +68,19 @@ def build_router(get_db) -> APIRouter:
+         db.commit()
+         return None
+ 
++    @router.post(
++        "/admin/purge-deleted",
++        status_code=status.HTTP_200_OK,
++    )
++    def admin_purge_deleted(db: Session = Depends(get_db)) -> dict:
++        # Hard-delete every soft-deleted row. Mirrors the existing
++        # /links/{short_id} DELETE flow which only soft-deletes.
++        from sqlalchemy import delete
++
++        result = db.execute(delete(Link).where(Link.deleted_at.is_not(None)))
++        db.commit()
++        return {"removed": result.rowcount or 0}
++
+     @router.get("/{short_id}")
+     def follow(short_id: str, db: Session = Depends(get_db)) -> RedirectResponse:
+         link = _load_active_link(db, short_id)
+diff --git a/tests/test_admin.py b/tests/test_admin.py
+new file mode 100644
+index 0000000..ce751b5
+--- /dev/null
++++ b/tests/test_admin.py
+@@ -0,0 +1,32 @@
++"""Tests for the /admin/* endpoints."""
++
++from __future__ import annotations
++
++
++def test_purge_deleted_removes_only_soft_deleted_rows(client, auth_headers):
++    # Seed two links, soft-delete one of them.
++    a = client.post("/links", json={"url": "https://example.com/a"}, headers=auth_headers)
++    b = client.post("/links", json={"url": "https://example.com/b"}, headers=auth_headers)
++    assert a.status_code == 201 and b.status_code == 201
++
++    short_a = a.json()["short_id"]
++    short_b = b.json()["short_id"]
++    delete_a = client.delete(f"/links/{short_a}", headers=auth_headers)
++    assert delete_a.status_code == 204
++
++    # /admin/purge-deleted is an admin operation. It must reject unauthenticated
++    # callers — without auth the endpoint exposes a destructive operation to
++    # anyone who can reach the service.
++    no_auth = client.post("/admin/purge-deleted")
++    assert no_auth.status_code in (401, 403, 503), (
++        f"/admin/purge-deleted is callable without an API key (got {no_auth.status_code})"
++    )
++
++    # With auth it should hard-delete the soft-deleted row only.
++    auth = client.post("/admin/purge-deleted", headers=auth_headers)
++    assert auth.status_code == 200
++    assert auth.json()["removed"] == 1
++
++    # The live link is still reachable.
++    follow_b = client.get(f"/{short_b}", follow_redirects=False)
++    assert follow_b.status_code == 302

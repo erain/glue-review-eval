@@ -6,34 +6,6 @@ index 0000000..138264a
 @@ -0,0 +1 @@
 +/home/ubuntu/src/glue-review-eval/hosts/python-linkr/.venv
 \ No newline at end of file
-diff --git a/app/__pycache__/__init__.cpython-312.pyc b/app/__pycache__/__init__.cpython-312.pyc
-new file mode 100644
-index 0000000..5a9e206
-Binary files /dev/null and b/app/__pycache__/__init__.cpython-312.pyc differ
-diff --git a/app/__pycache__/auth.cpython-312.pyc b/app/__pycache__/auth.cpython-312.pyc
-new file mode 100644
-index 0000000..8f862bc
-Binary files /dev/null and b/app/__pycache__/auth.cpython-312.pyc differ
-diff --git a/app/__pycache__/main.cpython-312.pyc b/app/__pycache__/main.cpython-312.pyc
-new file mode 100644
-index 0000000..eac30a1
-Binary files /dev/null and b/app/__pycache__/main.cpython-312.pyc differ
-diff --git a/app/__pycache__/models.cpython-312.pyc b/app/__pycache__/models.cpython-312.pyc
-new file mode 100644
-index 0000000..f698c22
-Binary files /dev/null and b/app/__pycache__/models.cpython-312.pyc differ
-diff --git a/app/__pycache__/routes.cpython-312.pyc b/app/__pycache__/routes.cpython-312.pyc
-new file mode 100644
-index 0000000..666f792
-Binary files /dev/null and b/app/__pycache__/routes.cpython-312.pyc differ
-diff --git a/app/__pycache__/schemas.cpython-312.pyc b/app/__pycache__/schemas.cpython-312.pyc
-new file mode 100644
-index 0000000..44ee5b3
-Binary files /dev/null and b/app/__pycache__/schemas.cpython-312.pyc differ
-diff --git a/app/__pycache__/shortener.cpython-312.pyc b/app/__pycache__/shortener.cpython-312.pyc
-new file mode 100644
-index 0000000..b17435b
-Binary files /dev/null and b/app/__pycache__/shortener.cpython-312.pyc differ
 diff --git a/app/routes.py b/app/routes.py
 index 797c2ad..af3ac3a 100644
 --- a/app/routes.py
@@ -70,34 +42,6 @@ index 797c2ad..af3ac3a 100644
      @router.get("/{short_id}")
      def follow(short_id: str, db: Session = Depends(get_db)) -> RedirectResponse:
          link = _load_active_link(db, short_id)
-diff --git a/linkr.db b/linkr.db
-new file mode 100644
-index 0000000..c6ea1aa
-Binary files /dev/null and b/linkr.db differ
-diff --git a/tests/__pycache__/__init__.cpython-312.pyc b/tests/__pycache__/__init__.cpython-312.pyc
-new file mode 100644
-index 0000000..0703764
-Binary files /dev/null and b/tests/__pycache__/__init__.cpython-312.pyc differ
-diff --git a/tests/__pycache__/conftest.cpython-312-pytest-9.0.3.pyc b/tests/__pycache__/conftest.cpython-312-pytest-9.0.3.pyc
-new file mode 100644
-index 0000000..64f41f5
-Binary files /dev/null and b/tests/__pycache__/conftest.cpython-312-pytest-9.0.3.pyc differ
-diff --git a/tests/__pycache__/test_health.cpython-312-pytest-9.0.3.pyc b/tests/__pycache__/test_health.cpython-312-pytest-9.0.3.pyc
-new file mode 100644
-index 0000000..a5e3693
-Binary files /dev/null and b/tests/__pycache__/test_health.cpython-312-pytest-9.0.3.pyc differ
-diff --git a/tests/__pycache__/test_links.cpython-312-pytest-9.0.3.pyc b/tests/__pycache__/test_links.cpython-312-pytest-9.0.3.pyc
-new file mode 100644
-index 0000000..0b796f4
-Binary files /dev/null and b/tests/__pycache__/test_links.cpython-312-pytest-9.0.3.pyc differ
-diff --git a/tests/__pycache__/test_shortener.cpython-312-pytest-9.0.3.pyc b/tests/__pycache__/test_shortener.cpython-312-pytest-9.0.3.pyc
-new file mode 100644
-index 0000000..96531c7
-Binary files /dev/null and b/tests/__pycache__/test_shortener.cpython-312-pytest-9.0.3.pyc differ
-diff --git a/tests/__pycache__/test_stats.cpython-312-pytest-9.0.3.pyc b/tests/__pycache__/test_stats.cpython-312-pytest-9.0.3.pyc
-new file mode 100644
-index 0000000..5c5648c
-Binary files /dev/null and b/tests/__pycache__/test_stats.cpython-312-pytest-9.0.3.pyc differ
 diff --git a/tests/test_stats.py b/tests/test_stats.py
 new file mode 100644
 index 0000000..d40ac2f

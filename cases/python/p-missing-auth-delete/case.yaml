@@ -1,0 +1,48 @@
+id: p-missing-auth-delete
+language: python
+host: python-linkr
+category: security
+severity: high
+title: "routes: POST /admin/purge-deleted (hard-delete soft-deleted rows)"
+summary: |
+  Adds a small admin endpoint to compact the table by hard-deleting rows
+  that were previously soft-deleted via DELETE /links/{short_id}. Mirrors
+  the existing soft-delete flow.
+
+planted:
+  description: |
+    The new /admin/purge-deleted handler omits
+    `dependencies=[Depends(require_api_key)]`. Every other write endpoint
+    in routes.py (POST /links, GET /links/{id}, DELETE /links/{id}) is
+    guarded — this one isn't. Because it lives under /admin/ and performs
+    a destructive operation, it should be at least as protected as the
+    soft-delete it cleans up after.
+  files:
+    - path: app/routes.py
+      lines: [71, 84]
+      kind: missing-auth
+
+expected:
+  must_flag:
+    - "routes\\.py"
+    - "(api[ -]?key|auth(entication)?|require_api_key|unauth)"
+    - "(admin|purge-?deleted|/admin/)"
+  must_not_flag:
+    - "SQL injection"
+    - "race condition"
+    - "memory leak"
+  fix_directives:
+    - "add `dependencies=[Depends(require_api_key)]` to the @router.post decorator for /admin/purge-deleted"
+    - "match the auth pattern used by POST /links and DELETE /links/{short_id}"
+    - "if the intent is to allow unauthenticated purge, document why explicitly — otherwise it's an oversight"
+
+acceptance:
+  setup: []
+  test_cmd: ".venv/bin/pytest tests/test_admin.py -q"
+  timeout_s: 60
+
+notes: |
+  Acceptance test `test_purge_deleted_removes_only_soft_deleted_rows`
+  first calls /admin/purge-deleted with NO headers; vulnerable code
+  returns 200, fix returns 401/403/503. The same test then re-runs with
+  auth and asserts the destructive behaviour is correct.

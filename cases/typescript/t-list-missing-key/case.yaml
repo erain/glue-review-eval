@@ -1,0 +1,47 @@
+id: t-list-missing-key
+language: typescript
+host: ts-notepad
+category: style
+severity: medium
+title: "NoteList: drop the redundant key prop"
+summary: |
+  Removes the `key={note.id}` prop from the mapped `<li>` elements in
+  `NoteList.tsx`. A comment notes that the upstream sort is stable, so
+  React can fall back to positional reconciliation.
+
+planted:
+  description: |
+    Without an explicit `key` React reconciles list items by position,
+    which (a) emits the "Each child in a list should have a unique key"
+    console.error every render and (b) corrupts component state across
+    reorders — the sidebar reorders by `updatedAt` whenever a note is
+    edited, so any focus/selection state attached to a list-item child
+    will jump to the wrong row.
+  files:
+    - path: src/components/NoteList.tsx
+      lines: [38, 45]
+      kind: missing-react-key
+
+expected:
+  must_flag:
+    - "src/components/NoteList\\.tsx|NoteList"
+    - "(key( prop)?|unique key|reconcil)"
+  must_not_flag:
+    - "accessibility"
+    - "xss"
+    - "memory leak"
+  fix_directives:
+    - "restore `key={note.id}` on the mapped <li> element"
+    - "remove the misleading 'no need for an explicit key' comment"
+
+acceptance:
+  setup: []
+  test_cmd: "npm test -- --run src/__tests__/NoteList.keys.test.tsx"
+  timeout_s: 120
+
+notes: |
+  The new test renders three notes, spies on `console.error`, and
+  fails if any log message matches the React missing-key warning
+  pattern. The justification comment in the diff ("iteration is
+  stable") is wrong — `sortedNotes` reorders by `updatedAt` whenever
+  a note is edited.

@@ -1,0 +1,29 @@
+id: g-clean-extract
+language: go
+host: go-glog
+category: clean
+severity: none
+title: "render: extract nonReservedKeys helper"
+summary: |
+  Pulls the reserved-key filtering loop out of plain.Render into a small
+  nonReservedKeys(e) helper so the rendering function reads as a
+  straight-line sequence of "header, message, tail" steps. No behaviour
+  change; all tests still pass.
+
+planted: {}
+
+expected:
+  must_flag:
+    - "(lgtm|looks good|no concerns|no issues|approve|approved)"
+  must_not_flag:
+    - "race condition"
+    - "memory leak"
+    - "off-by-one"
+    - "missing test"
+  fix_directives: []
+
+notes: |
+  Pure refactor. The reviewer should approve (or at most leave a tiny
+  style nudge) and must not invent off-by-one, missing-test, or
+  thread-safety concerns. There's no acceptance gate — clean cases test
+  the reviewer's false-positive resistance.

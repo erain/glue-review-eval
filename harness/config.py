@@ -20,8 +20,22 @@ GLUE_REVIEW_BIN = GLUE_REPO / "glue-review"
 
 # Pinned by env so an iteration's `--provider` / `--model` is reproducible
 # from the scorecard row alone.
-REVIEW_PROVIDER = os.environ.get("REVIEW_PROVIDER", "openrouter")
-REVIEW_MODEL = os.environ.get("REVIEW_MODEL", "inclusionai/ring-2.6-1t:free")
+# Default reviewer = whatever key is in env. We try OpenRouter first since
+# that's the indie-hacker shipping target, then NVIDIA (the dev fallback
+# that the glue CI also exercises), then Gemini.
+def _default_provider() -> tuple[str, str]:
+    if os.environ.get("OPENROUTER_API_KEY"):
+        return "openrouter", "inclusionai/ring-2.6-1t:free"
+    if os.environ.get("NVIDIA_API_KEY"):
+        return "nvidia", "meta/llama-3.3-70b-instruct"
+    if os.environ.get("GEMINI_API_KEY"):
+        return "gemini", "gemini-2.5-flash"
+    return "openrouter", "inclusionai/ring-2.6-1t:free"  # will fail at runtime; explicit
+
+
+_provider, _model = _default_provider()
+REVIEW_PROVIDER = os.environ.get("REVIEW_PROVIDER", _provider)
+REVIEW_MODEL = os.environ.get("REVIEW_MODEL", _model)
 
 # Layer 2 judge.
 JUDGE_MODEL = os.environ.get("JUDGE_MODEL", "claude-sonnet-4-6")

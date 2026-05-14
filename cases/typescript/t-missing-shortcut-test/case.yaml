@@ -1,0 +1,47 @@
+id: t-missing-shortcut-test
+language: typescript
+host: ts-notepad
+category: missing-test
+severity: medium
+title: "shortcuts: extract useShortcuts hook"
+summary: |
+  Pulls the global keyboard-shortcut wiring out of `App.tsx` into a
+  new `useShortcuts` hook in `src/hooks/useShortcuts.ts`. Behaviour is
+  unchanged: Cmd/Ctrl+N creates a note, Cmd/Ctrl+S force-flushes the
+  pending autosave write.
+
+planted:
+  description: |
+    The PR introduces `src/hooks/useShortcuts.ts` as the canonical
+    home for app-level keybindings, replacing the inline `useEffect`
+    in `App.tsx`. The new hook owns a non-trivial keydown listener
+    (Cmd/Ctrl mod detection, `e.preventDefault`, `key.toLowerCase`,
+    multiple branches) yet ships with no test. None of the existing
+    test files exercise window keydown — there is no `App.test.tsx`,
+    no `useShortcuts.test.ts`, and the keymap logic could regress
+    silently (wrong key, missing preventDefault, broken Ctrl variant
+    on Linux).
+  files:
+    - path: src/hooks/useShortcuts.ts
+      lines: [1, 37]
+      kind: untested-hook
+
+expected:
+  must_flag:
+    - "(useShortcuts|src/hooks/useShortcuts\\.ts)"
+    - "(no test|missing test|untested|test coverage|add a test)"
+  must_not_flag:
+    - "race condition"
+    - "memory leak"
+    - "xss"
+  fix_directives:
+    - "add src/__tests__/useShortcuts.test.ts that dispatches a Cmd+N keydown and asserts onNewNote was called"
+    - "cover the Ctrl variant and the Cmd+S → onSave branch in the same file"
+    - "assert that preventDefault is called for the handled keys"
+
+notes: |
+  No acceptance gate — this is a missing-test case. Reviewer should
+  point at the new `useShortcuts` hook and ask for coverage of the
+  Cmd/Ctrl+N and Cmd/Ctrl+S branches, including the `preventDefault`
+  contract. The existing test suite still passes because there were
+  no tests for the inline keymap before the refactor either.

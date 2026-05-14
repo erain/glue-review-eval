@@ -1,0 +1,222 @@
+[
+  {
+    "case_id": "g-doc-stale-flag",
+    "language": "go",
+    "category": "doc",
+    "executor": "codex",
+    "had_fix_block": true,
+    "fix_applied": true,
+    "acceptance_passed": false,
+    "test_cmd": "grep -q -- '--since' README.md && grep -q -- '--until' README.md",
+    "notes": "fix landed but acceptance still red"
+  },
+  {
+    "case_id": "g-ignored-unmarshal-err",
+    "language": "go",
+    "category": "logic-bug",
+    "executor": "codex",
+    "had_fix_block": true,
+    "fix_applied": true,
+    "acceptance_passed": true,
+    "test_cmd": "go test ./entry/ -run TestParse_InvalidJSONIsUnparsed",
+    "notes": "ok"
+  },
+  {
+    "case_id": "g-leaked-file-handle",
+    "language": "go",
+    "category": "logic-bug",
+    "executor": "codex",
+    "had_fix_block": false,
+    "fix_applied": false,
+    "acceptance_passed": false,
+    "test_cmd": "go test ./cmd/glog/ -run TestRun_FilePathDoesNotLeakFDs",
+    "notes": "no fenced ```markdown fix block in reviewer comment"
+  },
+  {
+    "case_id": "g-missing-flag-test",
+    "language": "go",
+    "category": "missing-test",
+    "executor": "codex",
+    "had_fix_block": true,
+    "fix_applied": false,
+    "acceptance_passed": false,
+    "test_cmd": "go test ./render/ -run TestPlainQuoted && go test ./cmd/glog/ -run TestRun_Quote",
+    "notes": "acceptance test was already green on the patched repo (case wiring bug)"
+  },
+  {
+    "case_id": "g-off-by-one-bound",
+    "language": "go",
+    "category": "logic-bug",
+    "executor": "codex",
+    "had_fix_block": true,
+    "fix_applied": true,
+    "acceptance_passed": true,
+    "test_cmd": "go test ./cmd/glog/ -run TestRun_LastReturnsExactlyN",
+    "notes": "ok"
+  },
+  {
+    "case_id": "g-style-export-name",
+    "language": "go",
+    "category": "style",
+    "executor": "codex",
+    "had_fix_block": true,
+    "fix_applied": false,
+    "acceptance_passed": false,
+    "test_cmd": "go vet ./filter/... && go build ./...",
+    "notes": "acceptance test was already green on the patched repo (case wiring bug)"
+  },
+  {
+    "case_id": "p-clean-typing",
+    "language": "python",
+    "category": "clean",
+    "executor": "codex",
+    "had_fix_block": false,
+    "fix_applied": false,
+    "acceptance_passed": false,
+    "test_cmd": ".venv/bin/pytest -q",
+    "notes": "no fenced ```markdown fix block in reviewer comment"
+  },
+  {
+    "case_id": "p-doc-url-mismatch",
+    "language": "python",
+    "category": "doc",
+    "executor": "codex",
+    "had_fix_block": false,
+    "fix_applied": false,
+    "acceptance_passed": false,
+    "test_cmd": ".venv/bin/pytest -q",
+    "notes": "no fenced ```markdown fix block in reviewer comment"
+  },
+  {
+    "case_id": "p-missing-auth-delete",
+    "language": "python",
+    "category": "security",
+    "executor": "codex",
+    "had_fix_block": true,
+    "fix_applied": true,
+    "acceptance_passed": true,
+    "test_cmd": ".venv/bin/pytest tests/test_admin.py -q",
+    "notes": "ok"
+  },
+  {
+    "case_id": "p-multi-auth-and-test",
+    "language": "python",
+    "category": "multi-bug",
+    "executor": "codex",
+    "had_fix_block": true,
+    "fix_applied": true,
+    "acceptance_passed": true,
+    "test_cmd": ".venv/bin/pytest tests/test_admin_links.py -q",
+    "notes": "ok"
+  },
+  {
+    "case_id": "p-mutable-default-arg",
+    "language": "python",
+    "category": "logic-bug",
+    "executor": "codex",
+    "had_fix_block": true,
+    "fix_applied": true,
+    "acceptance_passed": true,
+    "test_cmd": ".venv/bin/pytest tests/test_tried_default.py -q",
+    "notes": "ok"
+  },
+  {
+    "case_id": "p-pydantic-loose-types",
+    "language": "python",
+    "category": "style",
+    "executor": "codex",
+    "had_fix_block": true,
+    "fix_applied": true,
+    "acceptance_passed": true,
+    "test_cmd": ".venv/bin/pytest tests/test_link_validation.py -q",
+    "notes": "ok"
+  },
+  {
+    "case_id": "p-short-id-loop-no-cap",
+    "language": "python",
+    "category": "logic-bug",
+    "executor": "codex",
+    "had_fix_block": true,
+    "fix_applied": true,
+    "acceptance_passed": false,
+    "test_cmd": ".venv/bin/pytest tests/test_unbounded_retry.py -q",
+    "notes": "fix landed but acceptance still red"
+  },
+  {
+    "case_id": "p-sql-injection-stats",
+    "language": "python",
+    "category": "security",
+    "executor": "codex",
+    "had_fix_block": true,
+    "fix_applied": false,
+    "acceptance_passed": false,
+    "test_cmd": ".venv/bin/pytest tests/test_stats.py -q",
+    "notes": "executor failed: executor exit 1: \"ing with a parameterised query. Change:\\nERROR: You've hit your usage limit. To get more access now, send a request to your admin or try again at May 14th, 2026 12:11 AM.\\nERROR: You've hit your usage limit. To get more access now, send a request to your admin or try again at May 14th, 2026 12:11 AM.\\n\""
+  },
+  {
+    "case_id": "p-test-only",
+    "language": "python",
+    "category": "test-only",
+    "executor": "codex",
+    "had_fix_block": false,
+    "fix_applied": false,
+    "acceptance_passed": false,
+    "test_cmd": ".venv/bin/pytest -q",
+    "notes": "no fenced ```markdown fix block in reviewer comment"
+  },
+  {
+    "case_id": "t-debounce-removed",
+    "language": "typescript",
+    "category": "perf",
+    "executor": "codex",
+    "had_fix_block": true,
+    "fix_applied": false,
+    "acceptance_passed": false,
+    "test_cmd": "npm test -- --run src/__tests__/persistence-debounce.test.ts",
+    "notes": "executor failed: executor exit 1: 'ding\" or \"flush\" in the debounce sense.\\nERROR: You\\'ve hit your usage limit. To get more access now, send a request to your admin or try again at May 14th, 2026 12:11 AM.\\nERROR: You\\'ve hit your usage limit. To get more access now, send a request to your admin or try again at May 14th, 2026 12:11 AM.\\n'"
+  },
+  {
+    "case_id": "t-list-missing-key",
+    "language": "typescript",
+    "category": "style",
+    "executor": "codex",
+    "had_fix_block": true,
+    "fix_applied": false,
+    "acceptance_passed": false,
+    "test_cmd": "npm test -- --run src/__tests__/NoteList.keys.test.tsx",
+    "notes": "executor failed: executor exit 1: \"een.queryByText('Beta line')` is gone).\\nERROR: You've hit your usage limit. To get more access now, send a request to your admin or try again at May 14th, 2026 12:11 AM.\\nERROR: You've hit your usage limit. To get more access now, send a request to your admin or try again at May 14th, 2026 12:11 AM.\\n\""
+  },
+  {
+    "case_id": "t-multi-effect-and-leak",
+    "language": "typescript",
+    "category": "multi-bug",
+    "executor": "codex",
+    "had_fix_block": true,
+    "fix_applied": false,
+    "acceptance_passed": false,
+    "test_cmd": "npm test -- --run src/__tests__/editor-leak.test.tsx",
+    "notes": "executor failed: executor exit 1: \" fixed effect should look roughly like:\\nERROR: You've hit your usage limit. To get more access now, send a request to your admin or try again at May 14th, 2026 12:11 AM.\\nERROR: You've hit your usage limit. To get more access now, send a request to your admin or try again at May 14th, 2026 12:11 AM.\\n\""
+  },
+  {
+    "case_id": "t-stale-closure-effect",
+    "language": "typescript",
+    "category": "logic-bug",
+    "executor": "codex",
+    "had_fix_block": true,
+    "fix_applied": false,
+    "acceptance_passed": false,
+    "test_cmd": "npm test -- --run src/__tests__/stale-closure.test.tsx",
+    "notes": "executor failed: executor exit 1: \"e-closure.test.tsx` passes (1 passing).\\nERROR: You've hit your usage limit. To get more access now, send a request to your admin or try again at May 14th, 2026 12:11 AM.\\nERROR: You've hit your usage limit. To get more access now, send a request to your admin or try again at May 14th, 2026 12:11 AM.\\n\""
+  },
+  {
+    "case_id": "t-xss-skip-sanitize",
+    "language": "typescript",
+    "category": "security",
+    "executor": "codex",
+    "had_fix_block": true,
+    "fix_applied": false,
+    "acceptance_passed": false,
+    "test_cmd": "npm test -- --run src/__tests__/markdown.test.ts",
+    "notes": "executor failed: executor exit 1: \"DOMPurify.sanitize()` before returning.\\nERROR: You've hit your usage limit. To get more access now, send a request to your admin or try again at May 14th, 2026 12:11 AM.\\nERROR: You've hit your usage limit. To get more access now, send a request to your admin or try again at May 14th, 2026 12:11 AM.\\n\""
+  }
+]

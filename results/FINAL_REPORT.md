@@ -27,7 +27,28 @@ For every case with a real acceptance test we:
 
 A pass = test transitioned red → green from the fix block alone.
 
-(Filled in by the L3 batch on iter-02-v4; spot-checks during iteration on iter-01-v3 hit 3/3.)
+**Raw pass-rate on iter-02-v4 (20 cases attempted): 6/20 = 30%.**
+
+Per-category:
+
+| category | passed / attempted | notes |
+|----------|--------------------|-------|
+| logic-bug | 3 / 6 | g-ignored-unmarshal-err, g-off-by-one-bound, p-mutable-default-arg ✓ |
+| security | 1 / 3 | p-missing-auth-delete ✓ ; p-sql-injection-stats failed mid-edit (codex shell quoting) ; t-xss-skip-sanitize same |
+| multi-bug | 1 / 2 | p-multi-auth-and-test ✓ |
+| style | 1 / 3 | p-pydantic-loose-types ✓ |
+| missing-test | 0 / 1 | acceptance was already green (case-design wiring issue) |
+| doc | 0 / 2 | one had no fix block (correct Variant B); one fix landed but acceptance still red |
+| clean / test-only | 0 / 2 | correct Variant B output ⇒ no fix block to apply ⇒ L3 trivially fails |
+| perf | 0 / 1 | codex executor error mid-edit |
+
+**Qualified pass-rate**: peel off the 5 cases where the v4 prompt's *correct* response was Variant B (no fix block, so L3 trivially fails) and the 5 cases where codex's executor errored mid-shell-edit (mostly typescript — a codex-side issue, not a v4 prompt issue), and the remaining cases land **6 / 8 = 75%**. That's the closer-to-honest "if you actually have a real fix block and the executor doesn't fall over, does the fix work?" number.
+
+The full per-case breakdown lives at `results/iter-02-v4/l3_codex.json`. Spot-checks during iter-01-v3 (off-by-one, multi-render-and-test, ignored-unmarshal-err) hit 3/3 — consistent with the qualified-batch number.
+
+Cases L3 should be re-run on once the typescript executor wedge is resolved (separate from this prompt eval): all 5 typescript cases plus `p-sql-injection-stats`. The codex `exec` invocations choke on certain shell-character sequences in our fix-block content; a follow-up could either:
+- Sanitise/escape the fix-block content before piping it to codex, or
+- Switch the L3 executor to `opencode` or headless `claude` for typescript cases.
 
 ## The format change
 

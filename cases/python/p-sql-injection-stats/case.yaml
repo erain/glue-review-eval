@@ -1,0 +1,48 @@
+id: p-sql-injection-stats
+language: python
+host: python-linkr
+category: security
+severity: critical
+title: "routes: add GET /links/{short_id}/stats endpoint"
+summary: |
+  Adds a new authenticated endpoint that returns a link's hit count and
+  creation timestamp without going through the ORM mapper. Uses a single
+  raw SQL SELECT for simplicity and skips an extra round-trip to load the
+  full Link row.
+
+planted:
+  description: |
+    The new /links/{short_id}/stats handler builds its WHERE clause by
+    f-string interpolating the user-controlled short_id directly into the
+    SQL text. A short_id of `abc' OR '1'='1` breaks out of the quoted
+    literal and leaks any row not soft-deleted, defeating both the
+    intended lookup and the deleted_at guard.
+  files:
+    - path: app/routes.py
+      lines: [78, 95]
+      kind: sql-injection
+
+expected:
+  must_flag:
+    - "routes\\.py"
+    - "(SQL injection|sql injection|injection|parameteris|parameteriz|bound parameter|f-?string)"
+    - "short_?id"
+  must_not_flag:
+    - "race condition"
+    - "memory leak"
+    - "thread safety"
+  fix_directives:
+    - "replace the f-string with a parameterised query (bindparams or :short_id)"
+    - "use the ORM (select(Link.hits, Link.created_at).where(Link.short_id == short_id)) for consistency with the rest of routes.py"
+    - "add or keep a test that passes a short_id containing SQL metacharacters and asserts 404"
+
+acceptance:
+  setup: []
+  test_cmd: ".venv/bin/pytest tests/test_stats.py -q"
+  timeout_s: 60
+
+notes: |
+  Acceptance test is `tests/test_stats.py::test_stats_rejects_sql_metacharacters`.
+  It seeds one row and queries with `abc' OR '1'='1`. With raw interpolation
+  the WHERE matches the seeded row; with a parameterised query the literal
+  short_id finds nothing and returns 404.

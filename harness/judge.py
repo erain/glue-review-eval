@@ -80,30 +80,66 @@ def _build_prompt(case: Case, comment: str) -> str:
     )
 
 
-def _judge_call(prompt: str) -> dict:
-    try:
-        from anthropic import Anthropic  # type: ignore
-    except ImportError:
-        raise RuntimeError(
-            "anthropic SDK not installed. `pip install anthropic` "
-            "(or `uv pip install anthropic`)."
-        )
+JUDGE_SYSTEM = (
+    "You are a strict, calibrated evaluator. Return ONLY the JSON object "
+    "requested — no markdown fences, no preamble, no trailing prose."
+)
+
+
+def _judge_call_sdk(prompt: str) -> str:
+    from anthropic import Anthropic  # type: ignore
+
     client = Anthropic()
     msg = client.messages.create(
         model=JUDGE_MODEL,
         max_tokens=400,
-        system=(
-            "You are a strict, calibrated evaluator. Return ONLY the JSON "
-            "object requested — no markdown fences, no preamble, no trailing prose."
-        ),
+        system=JUDGE_SYSTEM,
         messages=[{"role": "user", "content": prompt}],
     )
-    text = "".join(
+    return "".join(
         b.text for b in msg.content if getattr(b, "type", None) == "text"
     ).strip()
+
+
+def _judge_call_cli(prompt: str) -> str:
+    """Headless `claude -p` invocation. Uses the Claude Code Max subscription
+    rather than an ANTHROPIC_API_KEY, at the cost of CLI startup overhead.
+    """
+    import subprocess
+
+    # `--bare` strips hooks, plugins, auto-memory — fast and deterministic.
+    # We pass system+user as a single prompt because --bare keeps things minimal.
+    full_prompt = JUDGE_SYSTEM + "\n\n" + prompt
+    proc = subprocess.run(
+        [
+            "claude",
+            "--bare",
+            "--print",
+            "--model", "sonnet",
+            full_prompt,
+        ],
+        capture_output=True, text=True, timeout=120,
+    )
+    if proc.returncode != 0:
+        raise RuntimeError(
+            f"claude CLI exited {proc.returncode}; stderr={proc.stderr[-300:]}"
+        )
+    return proc.stdout.strip()
+
+
+def _judge_call(prompt: str) -> dict:
+    if os.environ.get("ANTHROPIC_API_KEY"):
+        text = _judge_call_sdk(prompt)
+    else:
+        # No API key — fall back to the local `claude` CLI (Max subscription).
+        text = _judge_call_cli(prompt)
     # Defensive: strip code fences if model added them despite instructions.
     if text.startswith("```"):
         text = text.split("\n", 1)[1].rsplit("```", 1)[0]
+    # Some models prepend "Here's the JSON:" — find the first '{' and parse from there.
+    brace = text.find("{")
+    if brace > 0:
+        text = text[brace:]
     return json.loads(text)
 
 

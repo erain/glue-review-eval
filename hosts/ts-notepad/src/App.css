@@ -1,0 +1,128 @@
+.app {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  height: 100vh;
+}
+
+.note-list {
+  border-right: 1px solid #e2e2e2;
+  background: #f3f3f3;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.note-list__toolbar {
+  display: flex;
+  gap: 8px;
+  padding: 8px;
+  border-bottom: 1px solid #e2e2e2;
+}
+
+.note-list__toolbar button {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid #d0d0d0;
+  background: #fff;
+  border-radius: 4px;
+}
+
+.note-list__empty {
+  padding: 16px;
+  margin: 0;
+  font-size: 0.9em;
+  color: #666;
+}
+
+.note-list__items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.note-list__item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  padding: 8px 12px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid #ececec;
+  text-align: left;
+}
+
+.note-list__item:hover {
+  background: #ececec;
+}
+
+.note-list__item--selected {
+  background: #ddeaff;
+}
+
+.note-list__title {
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.note-list__time {
+  font-size: 0.75em;
+  color: #777;
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-width: 0;
+}
+
+.workspace__empty {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: #555;
+}
+
+.editor {
+  resize: none;
+  border: none;
+  border-right: 1px solid #e2e2e2;
+  padding: 16px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 14px;
+  line-height: 1.5;
+  outline: none;
+  background: #fff;
+}
+
+.preview {
+  padding: 16px;
+  overflow-y: auto;
+  background: #fff;
+}
+
+.preview h1,
+.preview h2,
+.preview h3 {
+  margin-top: 0.4em;
+}
+
+.preview pre {
+  background: #f3f3f3;
+  padding: 8px;
+  border-radius: 4px;
+  overflow-x: auto;
+}
+
+.preview code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}

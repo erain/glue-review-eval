@@ -1,0 +1,145 @@
+diff --git a/.venv b/.venv
+new file mode 120000
+index 0000000..138264a
+--- /dev/null
++++ b/.venv
+@@ -0,0 +1 @@
++/home/ubuntu/src/glue-review-eval/hosts/python-linkr/.venv
+\ No newline at end of file
+diff --git a/app/__pycache__/__init__.cpython-312.pyc b/app/__pycache__/__init__.cpython-312.pyc
+new file mode 100644
+index 0000000..5a9e206
+Binary files /dev/null and b/app/__pycache__/__init__.cpython-312.pyc differ
+diff --git a/app/__pycache__/auth.cpython-312.pyc b/app/__pycache__/auth.cpython-312.pyc
+new file mode 100644
+index 0000000..8f862bc
+Binary files /dev/null and b/app/__pycache__/auth.cpython-312.pyc differ
+diff --git a/app/__pycache__/main.cpython-312.pyc b/app/__pycache__/main.cpython-312.pyc
+new file mode 100644
+index 0000000..eac30a1
+Binary files /dev/null and b/app/__pycache__/main.cpython-312.pyc differ
+diff --git a/app/__pycache__/models.cpython-312.pyc b/app/__pycache__/models.cpython-312.pyc
+new file mode 100644
+index 0000000..f698c22
+Binary files /dev/null and b/app/__pycache__/models.cpython-312.pyc differ
+diff --git a/app/__pycache__/routes.cpython-312.pyc b/app/__pycache__/routes.cpython-312.pyc
+new file mode 100644
+index 0000000..666f792
+Binary files /dev/null and b/app/__pycache__/routes.cpython-312.pyc differ
+diff --git a/app/__pycache__/schemas.cpython-312.pyc b/app/__pycache__/schemas.cpython-312.pyc
+new file mode 100644
+index 0000000..44ee5b3
+Binary files /dev/null and b/app/__pycache__/schemas.cpython-312.pyc differ
+diff --git a/app/__pycache__/shortener.cpython-312.pyc b/app/__pycache__/shortener.cpython-312.pyc
+new file mode 100644
+index 0000000..b17435b
+Binary files /dev/null and b/app/__pycache__/shortener.cpython-312.pyc differ
+diff --git a/app/routes.py b/app/routes.py
+index 797c2ad..af3ac3a 100644
+--- a/app/routes.py
++++ b/app/routes.py
+@@ -4,7 +4,7 @@ from __future__ import annotations
+ 
+ from fastapi import APIRouter, Depends, HTTPException, status
+ from fastapi.responses import RedirectResponse
+-from sqlalchemy import select
++from sqlalchemy import select, text
+ from sqlalchemy.orm import Session
+ 
+ from app.auth import require_api_key
+@@ -68,6 +68,22 @@ def build_router(get_db) -> APIRouter:
+         db.commit()
+         return None
+ 
++    @router.get(
++        "/links/{short_id}/stats",
++        dependencies=[Depends(require_api_key)],
++    )
++    def link_stats(short_id: str, db: Session = Depends(get_db)) -> dict:
++        # Single-query stats: raw SQL keeps this one endpoint dependency-free
++        # of the ORM mapper.
++        sql = (
++            f"SELECT hits, created_at FROM links "
++            f"WHERE short_id = '{short_id}' AND deleted_at IS NULL"
++        )
++        row = db.execute(text(sql)).first()
++        if row is None:
++            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="not found")
++        return {"hits": row.hits, "created_at": str(row.created_at)}
++
+     @router.get("/{short_id}")
+     def follow(short_id: str, db: Session = Depends(get_db)) -> RedirectResponse:
+         link = _load_active_link(db, short_id)
+diff --git a/linkr.db b/linkr.db
+new file mode 100644
+index 0000000..c6ea1aa
+Binary files /dev/null and b/linkr.db differ
+diff --git a/tests/__pycache__/__init__.cpython-312.pyc b/tests/__pycache__/__init__.cpython-312.pyc
+new file mode 100644
+index 0000000..0703764
+Binary files /dev/null and b/tests/__pycache__/__init__.cpython-312.pyc differ
+diff --git a/tests/__pycache__/conftest.cpython-312-pytest-9.0.3.pyc b/tests/__pycache__/conftest.cpython-312-pytest-9.0.3.pyc
+new file mode 100644
+index 0000000..64f41f5
+Binary files /dev/null and b/tests/__pycache__/conftest.cpython-312-pytest-9.0.3.pyc differ
+diff --git a/tests/__pycache__/test_health.cpython-312-pytest-9.0.3.pyc b/tests/__pycache__/test_health.cpython-312-pytest-9.0.3.pyc
+new file mode 100644
+index 0000000..a5e3693
+Binary files /dev/null and b/tests/__pycache__/test_health.cpython-312-pytest-9.0.3.pyc differ
+diff --git a/tests/__pycache__/test_links.cpython-312-pytest-9.0.3.pyc b/tests/__pycache__/test_links.cpython-312-pytest-9.0.3.pyc
+new file mode 100644
+index 0000000..0b796f4
+Binary files /dev/null and b/tests/__pycache__/test_links.cpython-312-pytest-9.0.3.pyc differ
+diff --git a/tests/__pycache__/test_shortener.cpython-312-pytest-9.0.3.pyc b/tests/__pycache__/test_shortener.cpython-312-pytest-9.0.3.pyc
+new file mode 100644
+index 0000000..96531c7
+Binary files /dev/null and b/tests/__pycache__/test_shortener.cpython-312-pytest-9.0.3.pyc differ
+diff --git a/tests/__pycache__/test_stats.cpython-312-pytest-9.0.3.pyc b/tests/__pycache__/test_stats.cpython-312-pytest-9.0.3.pyc
+new file mode 100644
+index 0000000..5c5648c
+Binary files /dev/null and b/tests/__pycache__/test_stats.cpython-312-pytest-9.0.3.pyc differ
+diff --git a/tests/test_stats.py b/tests/test_stats.py
+new file mode 100644
+index 0000000..d40ac2f
+--- /dev/null
++++ b/tests/test_stats.py
+@@ -0,0 +1,39 @@
++"""Tests for the /links/{short_id}/stats endpoint."""
++
++from __future__ import annotations
++
++
++def test_stats_returns_hit_count(client, auth_headers):
++    create = client.post(
++        "/links", json={"url": "https://example.com"}, headers=auth_headers,
++    )
++    assert create.status_code == 201
++    short_id = create.json()["short_id"]
++
++    r = client.get(f"/links/{short_id}/stats", headers=auth_headers)
++    assert r.status_code == 200
++    data = r.json()
++    assert data["hits"] == 0
++    assert "created_at" in data
++
++
++def test_stats_404_for_unknown(client, auth_headers):
++    r = client.get("/links/zzzzzz/stats", headers=auth_headers)
++    assert r.status_code == 404
++
++
++def test_stats_rejects_sql_metacharacters(client, auth_headers):
++    # Seed a row so there is something to leak. With a parameterised
++    # query, the metacharacter payload becomes a literal lookup that
++    # finds nothing (404). With raw interpolation, the SELECT matches
++    # the seeded row and we get 200 + its data.
++    seed = client.post(
++        "/links", json={"url": "https://example.com"}, headers=auth_headers,
++    )
++    assert seed.status_code == 201
++
++    payload = "abc' OR '1'='1"
++    r = client.get(f"/links/{payload}/stats", headers=auth_headers)
++    assert r.status_code == 404, (
++        "SQL metacharacters in short_id leaked data — query is not parameterised"
++    )

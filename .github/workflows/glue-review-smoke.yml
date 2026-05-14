@@ -7,9 +7,8 @@ name: glue-review smoke
 #   - Secret propagation in CI
 #   - The "comment lands on the PR thread" surface
 #
-# The action ref `erain/glue@eval/v3` pins to the v3 prompt branch in the
-# glue repo. Once v3 is merged into glue main, this should be re-pinned
-# to a release tag.
+# Pinned to the v2.0.0 release tag in erain/glue, which embeds the v3
+# prompt as the default and ships the safer soft-fail action.
 
 on:
   pull_request:
@@ -45,13 +44,13 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Run glue-review
-        uses: erain/glue/agents/glue-review@eval/v3
+        uses: erain/glue/agents/glue-review@v2
         with:
           provider: openrouter
-          model: inclusionai/ring-2.6-1t:free
-          prompt-version: v3
           openrouter-api-key: ${{ secrets.OPENROUTER_API_KEY }}
           nvidia-api-key: ${{ secrets.NVIDIA_API_KEY }}
           base-ref: ${{ github.event.pull_request.base.ref || 'main' }}
           pr-number: ${{ github.event.pull_request.number || inputs.pr-number }}
-          # Default max-turns 12 is fine; the case patches are small.
+          # @v2 defaults to prompt v3 (single-comment + fenced markdown
+          # fix-block format) and to OpenRouter's inclusionai/ring-2.6-1t:free
+          # — no need to set prompt-version or model explicitly.

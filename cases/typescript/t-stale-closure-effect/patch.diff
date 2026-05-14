@@ -1,0 +1,89 @@
+diff --git a/src/__tests__/stale-closure.test.tsx b/src/__tests__/stale-closure.test.tsx
+new file mode 100644
+index 0000000..cd23b01
+--- /dev/null
++++ b/src/__tests__/stale-closure.test.tsx
+@@ -0,0 +1,48 @@
++/** Regression: window-blur save-on-blur must persist the latest edit, not a snapshot. */
++
++import { act, renderHook } from '@testing-library/react';
++import { afterEach, beforeEach, describe, expect, it } from 'vitest';
++import { useNotes } from '../hooks/useNotes';
++import { STORAGE_KEY, loadState } from '../storage';
++
++beforeEach(() => {
++  localStorage.clear();
++});
++
++afterEach(() => {
++  localStorage.clear();
++});
++
++describe('useNotes: save on window blur', () => {
++  it('persists the most recent edit after multiple edit/blur cycles', () => {
++    const { result } = renderHook(() => useNotes());
++
++    let id = '';
++    act(() => {
++      id = result.current.createNote().id;
++    });
++
++    // First edit, then blur the window.
++    act(() => {
++      result.current.updateBody(id, 'first edit');
++    });
++    act(() => {
++      window.dispatchEvent(new Event('blur'));
++    });
++
++    // Second edit, then blur again. This is the edit that must survive.
++    act(() => {
++      result.current.updateBody(id, 'second edit (final)');
++    });
++    act(() => {
++      window.dispatchEvent(new Event('blur'));
++    });
++
++    // Inspect what landed in storage right after the second blur.
++    const raw = localStorage.getItem(STORAGE_KEY);
++    expect(raw).not.toBeNull();
++    const persisted = loadState(localStorage);
++    const note = persisted.notes.find((n) => n.id === id);
++    expect(note?.body).toBe('second edit (final)');
++  });
++});
+diff --git a/src/hooks/useNotes.ts b/src/hooks/useNotes.ts
+index 69c86ab..868730d 100644
+--- a/src/hooks/useNotes.ts
++++ b/src/hooks/useNotes.ts
+@@ -1,6 +1,6 @@
+ /** Note CRUD + selection state with debounced localStorage persistence. */
+ 
+-import { useCallback, useMemo, useState } from 'react';
++import { useCallback, useEffect, useMemo, useState } from 'react';
+ import { loadState, saveState, type StoredState } from '../storage';
+ import { newNote, titleOf, type Note } from '../types';
+ import { useDebouncedEffect } from './useDebounce';
+@@ -66,6 +66,22 @@ export function useNotes(): UseNotesApi {
+     );
+   }, []);
+ 
++  // Belt-and-braces persistence: when the window loses focus (user alt-tabs
++  // away, switches tabs, locks the screen) push the current snapshot to
++  // storage immediately so we don't lose anything sitting inside the
++  // debounce window. The debounced effect remains the primary path.
++  useEffect(() => {
++    const snapshot = state;
++    function onBlur() {
++      saveState(snapshot);
++    }
++    window.addEventListener('blur', onBlur);
++    return () => window.removeEventListener('blur', onBlur);
++    // Listener is registered once on mount; subsequent state changes are
++    // already covered by the debounced effect above, so we don't need to
++    // re-arm this on every keystroke.
++  }, []);
++
+   const sortedNotes = useMemo(
+     () =>
+       [...state.notes]

@@ -1,0 +1,74 @@
+id: p-multi-auth-and-test
+language: python
+host: python-linkr
+category: multi-bug
+severity: high
+title: "routes: add GET /admin/links operator listing endpoint"
+summary: |
+  Adds a small operator helper at `GET /admin/links` that returns every
+  non-soft-deleted Link row (short_id, url, hits, created_at). Intended
+  for an admin to spot-check what's live without poking at SQLite
+  directly. Declared before the `/{short_id}` catch-all so the redirect
+  handler doesn't shadow it.
+
+planted:
+  description: |
+    The PR is one route with two independent defects:
+
+      (a) Missing auth. The new `GET /admin/links` decorator has no
+          `dependencies=[Depends(require_api_key)]`, even though every
+          other `/links*` route — `POST /links`, `GET /links/{short_id}`,
+          `DELETE /links/{short_id}` — is guarded. The new path is under
+          `/admin/` and exposes the full link table, so an unauthenticated
+          caller can dump every live URL. The comparison the reviewer
+          has to make is to the surrounding read endpoints' auth pattern.
+
+      (b) No test for the new endpoint. The 26 existing tests still pass
+          because none of them touch `/admin/links`. There is no
+          happy-path coverage and no auth-rejection coverage. A future
+          refactor that quietly breaks this endpoint, or re-adds the
+          auth dependency incorrectly, will not be caught.
+
+    Both defects must be flagged in the same review.
+  files:
+    - path: app/routes.py
+      lines: [71, 88]
+      kind: missing-auth
+    - path: app/routes.py
+      lines: [71, 88]
+      kind: missing-test
+
+expected:
+  must_flag:
+    - "routes\\.py"
+    - "/admin/links"
+    - "(api[ -]?key|auth(entication)?|require_api_key|unauth|Depends\\(require_api_key)"
+    - "(missing test|no test|add a test|test coverage|no coverage|untested)"
+  must_not_flag:
+    - "SQL injection"
+    - "race condition"
+    - "memory leak"
+  fix_directives:
+    - "add `dependencies=[Depends(require_api_key)]` to the new @router.get(\"/admin/links\") decorator, matching POST /links and GET /links/{short_id}"
+    - "add a test in tests/ that covers the happy path (200 with auth, returns live rows, excludes soft-deleted) and the auth-rejection path (no header -> 401/403/503)"
+    - "consider returning a Pydantic response_model instead of a raw list[dict] for consistency with the other read endpoints"
+
+acceptance:
+  setup: []
+  test_cmd: ".venv/bin/pytest tests/test_admin_links.py -q"
+  timeout_s: 60
+
+notes: |
+  Multi-bug case. The captured patch contains the new route AND the
+  acceptance harness `tests/test_admin_links.py` — we ship the tests
+  here so the eval can verify both fixes, but the case framing is that
+  a real PR author would not have included these tests (that's part of
+  what the reviewer must call out). With the planted code,
+  `test_admin_links_requires_api_key` fails (endpoint returns 200
+  unauthenticated) while `test_admin_links_returns_live_rows_only`
+  passes. After adding the auth dependency, both pass.
+
+  The reviewer should produce a single comment with TWO numbered
+  fix-instructions: one for the missing auth, one for "add a test
+  covering happy path + auth rejection". `fix_directives` lists both
+  explicitly.

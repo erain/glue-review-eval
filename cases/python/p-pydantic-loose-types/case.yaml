@@ -1,0 +1,66 @@
+id: p-pydantic-loose-types
+language: python
+host: python-linkr
+category: style
+severity: low
+title: "schemas: loosen LinkCreate.url to plain str for lenient scheme parsing"
+summary: |
+  Drops the `AnyHttpUrl` constraint on `LinkCreate.url` in
+  `app/schemas.py` and replaces it with a plain `str`. The framing is
+  "more lenient parsing — accepts file:// and custom schemes". Updates
+  the existing `test_create_link_validates_url` test (which posted
+  "not-a-url" expecting 422) into `test_create_link_accepts_arbitrary_url_string`,
+  posting a `file:///tmp/local.txt` and expecting 201.
+
+planted:
+  description: |
+    Replacing `AnyHttpUrl` with `str` removes input validation from the
+    only user-supplied field in the POST /links body. Pydantic no longer
+    rejects "not a url", "<script>", an empty string, or anything else
+    that happens to type-check as a string — the shortener will hand
+    back a 6-char ID for any blob. The PR also rewrites the existing
+    validation test so the suite stops noticing the regression.
+
+    The fix is to restore a URL-typed field. `AnyHttpUrl` (http/https
+    only) matches the host's original behaviour; `AnyUrl` is a softer
+    landing if the genuine motivation is non-http schemes, and still
+    rejects unstructured strings.
+  files:
+    - path: app/schemas.py
+      lines: [7, 15]
+      kind: weakened-validation
+    - path: tests/test_links.py
+      lines: [35, 48]
+      kind: test-weakened
+
+expected:
+  must_flag:
+    - "(schemas\\.py|schemas)"
+    - "(HttpUrl|AnyHttpUrl|AnyUrl|URL type)"
+    - "(validation|input validation|URL validation|sanitisation|sanitization)"
+    - "(plain str|`str`|untyped|too loose|loosened|weakened)"
+  must_not_flag:
+    - "SQL injection"
+    - "race condition"
+    - "memory leak"
+  fix_directives:
+    - "restore a URL-typed field on LinkCreate.url — AnyHttpUrl matches the prior behaviour; AnyUrl is acceptable if non-http schemes are truly required"
+    - "revert the rewrite of test_create_link_validates_url; that test was the regression guard the PR just silenced"
+    - "if file:// support is intentional, justify it in the route handler and add explicit tests for the allowed scheme set rather than dropping validation entirely"
+
+acceptance:
+  setup: []
+  test_cmd: ".venv/bin/pytest tests/test_link_validation.py -q"
+  timeout_s: 60
+
+notes: |
+  Low-severity style/validation case. With the planted change
+  (`url: str`), POST /links with `{"url": "not a url"}` is accepted as
+  a 201; `tests/test_link_validation.py::test_create_link_rejects_non_url_string`
+  fails. Restoring `AnyHttpUrl` (or any Pydantic URL type) makes the
+  acceptance test pass.
+
+  The reviewer's job is to call out that "lenient parsing" here means
+  "no parsing", name the Pydantic URL type concept (HttpUrl / AnyHttpUrl
+  / AnyUrl), point at schemas.py, and note that the existing 422 test
+  was rewritten away — that's the canary the PR disabled.

@@ -1,0 +1,59 @@
+id: g-rejected-package-mutable
+language: go
+host: go-glog
+category: rejected-direction
+severity: high
+title: "filter: expose GlobalFilter for cross-package use"
+summary: |
+  Adds a package-level `var GlobalFilter *Filter` to the filter package
+  and a `MatchGlobal(entry.Entry) bool` helper. cmd/glog publishes its
+  filter into GlobalFilter after construction and switches the main loop
+  from `flt.Match(e)` to `filter.MatchGlobal(e)` so other helpers can
+  consult "the current filter" without taking *Filter as an argument.
+
+planted:
+  description: |
+    This is not a bug — the new behaviour is identical for the single-
+    process CLI. It is, however, the wrong direction. It introduces
+    global mutable state into a package that was previously a clean
+    value type, makes test isolation impossible (any test that runs
+    `run()` mutates a shared global), trades the existing explicit
+    dependency-passing for hidden coupling, and bakes in an assumption
+    ("single-process tool") that future callers (library use, in-process
+    multiplexing) will quietly violate.
+
+    The reviewer should reject the direction outright: revert the
+    GlobalFilter / MatchGlobal additions and keep `*Filter` as an
+    explicit argument. If consolidating filter+render at the call site
+    is desirable, do it with a local struct in cmd/glog, not a package
+    global.
+  files:
+    - path: filter/filter.go
+      lines: [116, 140]
+      kind: global-mutable-state
+    - path: cmd/glog/main.go
+      lines: [85, 130]
+      kind: hidden-coupling
+
+expected:
+  must_flag:
+    - "global|package[ -]?level|package var"
+    - "(mutable|shared[ -]?state|hidden coupling)"
+    - "(test isolation|dependency injection|dependency[ -]?passing|threading|argument)"
+    - "(wrong direction|revert|rollback|do not merge|reject)"
+  must_not_flag:
+    - "race condition"
+    - "memory leak"
+    - "off by one"
+  fix_directives:
+    - "revert the GlobalFilter and MatchGlobal additions in filter/filter.go"
+    - "restore `flt.Match(e)` in cmd/glog/main.go's main loop"
+    - "remove the `filter.GlobalFilter = flt` assignment in run()"
+    - "if cmd/glog wants to consolidate filter+render at the call site, build a local struct there; do not put a mutable global in the filter package"
+
+notes: |
+  Rejected-direction case — no acceptance test. The reviewer's job is to
+  push back on the design rather than to surface a regression. The PR's
+  rationale ("single-process tool — no need to pass the filter
+  everywhere; this is simpler") sounds reasonable in isolation, which is
+  the point: the reviewer should still reject it.

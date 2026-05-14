@@ -1,0 +1,63 @@
+id: p-rejected-globals
+language: python
+host: python-linkr
+category: rejected-direction
+severity: high
+title: "models, main: drop per-app DI; use module-level engine + get_db globals"
+summary: |
+  Refactors `app/models.py` and `app/main.py` to hold the SQLAlchemy engine
+  and session factory as module-level globals, with a plain `get_db()`
+  dependency that yields from them. The PR author argues this is simpler,
+  less boilerplate, and that lifespan-managed app state is overkill for a
+  single SQLite DB. `build_router()` no longer takes `get_db` as an
+  argument — it imports the global directly.
+
+planted:
+  description: |
+    The refactor walks away from per-app dependency injection, which is
+    what `tests/conftest.py` relies on to swap in a private in-memory
+    engine via `application.dependency_overrides[...]`. With the engine
+    constructed at import time as a module global, every test in the
+    process shares one connection pointed at the on-disk `./linkr.db`,
+    and `app.state.get_db` no longer exists for the fixture to key off.
+    The conftest imports break outright (`make_session_factory` /
+    `session_dependency` are gone) and the suite fails to collect.
+
+    This is a step backwards in testability and isolation dressed up as
+    a simplification. The reviewer should push back on the direction
+    itself rather than try to patch the new design.
+  files:
+    - path: app/models.py
+      lines: [1, 73]
+      kind: rejected-direction
+    - path: app/main.py
+      lines: [1, 29]
+      kind: rejected-direction
+    - path: app/routes.py
+      lines: [10, 18]
+      kind: rejected-direction
+
+expected:
+  must_flag:
+    - "(dependency injection|\\bDI\\b|dependency_overrides)"
+    - "(global|module-level|module level|singleton)"
+    - "(test|tests|fixture|conftest)"
+    - "(revert|rollback|roll back|wrong direction|step back|don't (apply|land|merge))"
+  must_not_flag:
+    - "SQL injection"
+    - "race condition"
+    - "memory leak"
+  fix_directives:
+    - "do not land this diff: revert app/models.py and app/main.py to the per-app DI design"
+    - "keep make_engine / make_session_factory / session_dependency so tests can override `application.dependency_overrides[application.state.get_db]` against a private in-memory engine"
+    - "if there is a real problem motivating the refactor (e.g. boilerplate in create_app), name it and narrow the scope — module-level globals are not the answer"
+
+notes: |
+  Rejected-direction case: there is intentionally no acceptance test for
+  a passing "fix". The diff bricks the existing 26-test suite at
+  collection time (the conftest's import of `make_session_factory` /
+  `session_dependency` fails) and removes `app.state.get_db`, which is
+  the key the override fixture targets. We evaluate the reviewer's
+  pushback via the judge — the must_flag set checks that the reviewer
+  names DI, globals, tests/dependency_overrides, and explicitly steers
+  away from applying the diff.

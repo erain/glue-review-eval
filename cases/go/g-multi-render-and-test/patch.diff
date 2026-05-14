@@ -1,0 +1,138 @@
+diff --git a/cmd/glog/main.go b/cmd/glog/main.go
+index 095fd44..d2d4107 100644
+--- a/cmd/glog/main.go
++++ b/cmd/glog/main.go
+@@ -29,7 +29,7 @@ Flags:
+   --grep    Go regex matched against the raw line
+   --field   key=value exact match; repeatable
+   -f, --follow   tail the file as it grows
+-  --out     plain|json (default plain)
++  --out     plain|json|csv (default plain)
+ `
+ 
+ // repeatable collects --field flag values. It satisfies flag.Value.
+diff --git a/render/render.go b/render/render.go
+index 334d5bd..8f0fd7b 100644
+--- a/render/render.go
++++ b/render/render.go
+@@ -25,11 +25,50 @@ func New(format string) (Renderer, error) {
+ 		return plain{}, nil
+ 	case "json":
+ 		return rawJSON{}, nil
++	case "csv":
++		return csv{}, nil
+ 	default:
+ 		return nil, fmt.Errorf("unknown output format %q", format)
+ 	}
+ }
+ 
++// csv renders each entry as a CSV record with columns:
++//   ts, level, msg, fields
++//
++// where `fields` is the existing key=val tail joined by spaces. Targets
++// spreadsheet imports for ad-hoc log triage.
++type csv struct{}
++
++func (csv) Render(w io.Writer, e entry.Entry) error {
++	var ts string
++	if e.HasTS {
++		ts = e.TS.UTC().Format(time.RFC3339)
++	}
++
++	var tail strings.Builder
++	keys := make([]string, 0, len(e.Fields))
++	for k := range e.Fields {
++		if _, skip := reservedKeys[k]; skip {
++			continue
++		}
++		keys = append(keys, k)
++	}
++	sort.Strings(keys)
++	for i, k := range keys {
++		if i > 0 {
++			tail.WriteByte(' ')
++		}
++		v, _ := e.FieldString(k)
++		tail.WriteString(k)
++		tail.WriteByte('=')
++		tail.WriteString(v)
++	}
++
++	row := []string{ts, strings.ToUpper(e.Level), e.Msg, tail.String()}
++	_, err := io.WriteString(w, strings.Join(row, ",")+"\n")
++	return err
++}
++
+ type rawJSON struct{}
+ 
+ func (rawJSON) Render(w io.Writer, e entry.Entry) error {
+diff --git a/render/render_csv_test.go b/render/render_csv_test.go
+new file mode 100644
+index 0000000..97fbe95
+--- /dev/null
++++ b/render/render_csv_test.go
+@@ -0,0 +1,64 @@
++package render
++
++import (
++	encsv "encoding/csv"
++	"bytes"
++	"strings"
++	"testing"
++
++	"github.com/erain/glog/entry"
++)
++
++// TestCSV_QuotesValuesWithCommas asserts that the csv renderer produces
++// output parseable by encoding/csv when a field value contains a comma.
++// The buggy renderer concatenates with naked commas, so the comma in
++// "hello, world" splits the message across columns and the row no longer
++// has the expected column count.
++func TestCSV_QuotesValuesWithCommas(t *testing.T) {
++	r, err := New("csv")
++	if err != nil {
++		t.Fatalf("New(csv): %v", err)
++	}
++
++	e := entry.Entry{
++		Raw:    `{"level":"info","msg":"hello, world","user":"a, b"}`,
++		Parsed: true,
++		Level:  "info",
++		Msg:    "hello, world",
++		Fields: map[string]any{
++			"level": "info",
++			"msg":   "hello, world",
++			"user":  "a, b",
++		},
++	}
++
++	var buf bytes.Buffer
++	if err := r.Render(&buf, e); err != nil {
++		t.Fatalf("Render: %v", err)
++	}
++
++	// Output must be a single record parseable by encoding/csv.
++	rdr := encsv.NewReader(strings.NewReader(buf.String()))
++	rdr.FieldsPerRecord = -1
++	records, err := rdr.ReadAll()
++	if err != nil {
++		t.Fatalf("encoding/csv could not parse renderer output %q: %v", buf.String(), err)
++	}
++	if len(records) != 1 {
++		t.Fatalf("expected 1 record, got %d: %q", len(records), buf.String())
++	}
++	row := records[0]
++
++	// Column order is ts, level, msg, fields. With unescaped commas the
++	// "hello, world" message would split into multiple columns and the
++	// row width would exceed the fixed four.
++	if got := len(row); got != 4 {
++		t.Fatalf("expected 4 columns, got %d: %#v (raw=%q)", got, row, buf.String())
++	}
++	if row[2] != "hello, world" {
++		t.Fatalf("msg column not preserved: got %q want %q (raw=%q)", row[2], "hello, world", buf.String())
++	}
++	if !strings.Contains(row[3], "user=a, b") {
++		t.Fatalf("user field not preserved in tail: got %q (raw=%q)", row[3], buf.String())
++	}
++}

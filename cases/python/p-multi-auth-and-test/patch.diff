@@ -1,0 +1,78 @@
+diff --git a/.venv b/.venv
+new file mode 120000
+index 0000000..138264a
+--- /dev/null
++++ b/.venv
+@@ -0,0 +1 @@
++/home/ubuntu/src/glue-review-eval/hosts/python-linkr/.venv
+\ No newline at end of file
+diff --git a/app/routes.py b/app/routes.py
+index 797c2ad..5237716 100644
+--- a/app/routes.py
++++ b/app/routes.py
+@@ -68,6 +68,23 @@ def build_router(get_db) -> APIRouter:
+         db.commit()
+         return None
+ 
++    # Operator helper: list every non-soft-deleted link so an admin can
++    # spot-check what's live without poking at SQLite directly. Declared
++    # before /{short_id} so the catch-all redirect handler doesn't shadow it.
++    @router.get("/admin/links")
++    def admin_list_links(db: Session = Depends(get_db)) -> list[dict]:
++        stmt = select(Link).where(Link.deleted_at.is_(None))
++        rows = db.execute(stmt).scalars().all()
++        return [
++            {
++                "short_id": row.short_id,
++                "url": row.url,
++                "hits": row.hits,
++                "created_at": row.created_at.isoformat(),
++            }
++            for row in rows
++        ]
++
+     @router.get("/{short_id}")
+     def follow(short_id: str, db: Session = Depends(get_db)) -> RedirectResponse:
+         link = _load_active_link(db, short_id)
+diff --git a/tests/test_admin_links.py b/tests/test_admin_links.py
+new file mode 100644
+index 0000000..f2710b9
+--- /dev/null
++++ b/tests/test_admin_links.py
+@@ -0,0 +1,36 @@
++"""Tests for the /admin/links operator endpoint."""
++
++from __future__ import annotations
++
++
++def _create(client, headers, url):
++    r = client.post("/links", json={"url": url}, headers=headers)
++    assert r.status_code == 201, r.text
++    return r.json()
++
++
++def test_admin_links_requires_api_key(client, auth_headers):
++    # Seed a couple of rows and soft-delete one, so the endpoint has
++    # something interesting to return when called with auth.
++    a = _create(client, auth_headers, "https://example.com/keep")
++    b = _create(client, auth_headers, "https://example.com/gone")
++    client.delete(f"/links/{b['short_id']}", headers=auth_headers)
++
++    # /admin/links is an operator endpoint that lists every live link.
++    # Without auth it must reject — matching every other /links route.
++    no_auth = client.get("/admin/links")
++    assert no_auth.status_code in (401, 403, 503), (
++        f"/admin/links is callable without an API key (got {no_auth.status_code})"
++    )
++
++
++def test_admin_links_returns_live_rows_only(client, auth_headers):
++    a = _create(client, auth_headers, "https://example.com/keep")
++    b = _create(client, auth_headers, "https://example.com/gone")
++    client.delete(f"/links/{b['short_id']}", headers=auth_headers)
++
++    r = client.get("/admin/links", headers=auth_headers)
++    assert r.status_code == 200
++    short_ids = {row["short_id"] for row in r.json()}
++    assert a["short_id"] in short_ids
++    assert b["short_id"] not in short_ids

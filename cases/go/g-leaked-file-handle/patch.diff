@@ -1,0 +1,87 @@
+diff --git a/cmd/glog/leak_test.go b/cmd/glog/leak_test.go
+new file mode 100644
+index 0000000..4ab9f98
+--- /dev/null
++++ b/cmd/glog/leak_test.go
+@@ -0,0 +1,67 @@
++package main
++
++import (
++	"bytes"
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++)
++
++// countOpenFDs returns the number of entries in /proc/self/fd. It is a coarse
++// proxy for open file descriptors held by the current process; works on Linux
++// and on any OS exposing /proc/self/fd. Tests using it should skip otherwise.
++func countOpenFDs(t *testing.T) int {
++	t.Helper()
++	entries, err := os.ReadDir("/proc/self/fd")
++	if err != nil {
++		t.Skipf("no /proc/self/fd: %v", err)
++	}
++	return len(entries)
++}
++
++// TestRun_FilePathDoesNotLeakFDs runs the file-path code path many times in
++// a tight loop and asserts that the open-fd count does not grow without
++// bound. With a leaking openSource the count climbs by one per iteration;
++// the fix keeps it within a small slack.
++func TestRun_FilePathDoesNotLeakFDs(t *testing.T) {
++	if _, err := os.Stat("/proc/self/fd"); err != nil {
++		t.Skipf("no /proc/self/fd: %v", err)
++	}
++
++	dir := t.TempDir()
++	path := filepath.Join(dir, "in.log")
++	body := strings.Join([]string{
++		`{"level":"info","msg":"one"}`,
++		`{"level":"info","msg":"two"}`,
++		`{"level":"info","msg":"three"}`,
++	}, "\n") + "\n"
++	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
++		t.Fatalf("write input: %v", err)
++	}
++
++	// Warm-up to let any one-shot allocations settle.
++	for i := 0; i < 5; i++ {
++		var out, errb bytes.Buffer
++		if code := run([]string{path}, strings.NewReader(""), &out, &errb); code != 0 {
++			t.Fatalf("warmup exit=%d stderr=%s", code, errb.String())
++		}
++	}
++	before := countOpenFDs(t)
++
++	const iters = 50
++	for i := 0; i < iters; i++ {
++		var out, errb bytes.Buffer
++		if code := run([]string{path}, strings.NewReader(""), &out, &errb); code != 0 {
++			t.Fatalf("iter %d exit=%d stderr=%s", i, code, errb.String())
++		}
++	}
++	after := countOpenFDs(t)
++
++	// Allow a small slack for unrelated allocations (test framework, GC
++	// finalisers, etc.) but reject leaks proportional to iters.
++	if after-before > 10 {
++		t.Fatalf("fd count grew by %d over %d iterations (before=%d after=%d): file handle leak in openSource",
++			after-before, iters, before, after)
++	}
++}
+diff --git a/cmd/glog/main.go b/cmd/glog/main.go
+index 095fd44..f09e62b 100644
+--- a/cmd/glog/main.go
++++ b/cmd/glog/main.go
+@@ -143,5 +143,8 @@ func openSource(ctx context.Context, path string, follow bool, stdin io.Reader)
+ 	if err != nil {
+ 		return nil, noop, err
+ 	}
+-	return tail.Lines(ctx, f), func() { f.Close() }, nil
++	// tail.Lines owns the reader until EOF or ctx-cancel; once its goroutine
++	// returns the *os.File is unreachable and will be reclaimed. Avoid a
++	// double-close path here.
++	return tail.Lines(ctx, f), noop, nil
+ }

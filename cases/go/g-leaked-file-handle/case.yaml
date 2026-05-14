@@ -1,0 +1,49 @@
+id: g-leaked-file-handle
+language: go
+host: go-glog
+category: logic-bug
+severity: medium
+title: "cmd/glog: simplify openSource cleanup"
+summary: |
+  Drops the explicit `f.Close()` cleanup for the file-path code path in
+  openSource on the rationale that tail.Lines owns the reader and the
+  *os.File is unreachable once its goroutine returns.
+
+planted:
+  description: |
+    The PR rationale is wrong. bufio.NewReader wraps an io.Reader; it does
+    not close it. Once tail.Lines drains and its goroutine exits, the
+    *os.File is unreachable but the underlying file descriptor is only
+    released when the runtime finaliser eventually runs (and that is not
+    guaranteed in a timely fashion). The buggy code leaks one fd per
+    invocation; leak_test.go shows ~50 extra fds over 50 iterations.
+  files:
+    - path: cmd/glog/main.go
+      lines: [142, 150]
+      kind: resource-leak
+
+expected:
+  must_flag:
+    - "cmd/glog/main\\.go|main\\.go|openSource"
+    - "(file[ -]?handle|file descriptor|fd leak|leak|resource leak)"
+    - "(close|Close\\(\\)|defer|f\\.Close)"
+  must_not_flag:
+    - "race condition"
+    - "deadlock"
+    - "buffer overflow"
+  fix_directives:
+    - "restore the explicit cleanup: `return tail.Lines(ctx, f), func() { f.Close() }, nil`"
+    - "bufio.NewReader does not close its underlying io.Reader; the caller must close the *os.File"
+    - "drop the misleading comment about tail.Lines owning the reader"
+
+acceptance:
+  setup: []
+  test_cmd: "go test ./cmd/glog/ -run TestRun_FilePathDoesNotLeakFDs"
+  timeout_s: 60
+
+notes: |
+  Acceptance is `TestRun_FilePathDoesNotLeakFDs`: invokes run() against a
+  real file 50 times in a loop and asserts the /proc/self/fd count grows by
+  no more than 10. Buggy code grows by ~50 (one fd per iteration); the fix
+  keeps the count flat. Skips automatically on platforms without
+  /proc/self/fd.

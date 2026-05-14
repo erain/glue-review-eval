@@ -1,0 +1,333 @@
+diff --git a/src/App.tsx b/src/App.tsx
+index d60325e..2618df2 100644
+--- a/src/App.tsx
++++ b/src/App.tsx
+@@ -4,20 +4,14 @@ import { useEffect } from 'react';
+ import NoteList from './components/NoteList';
+ import Editor from './components/Editor';
+ import Preview from './components/Preview';
+-import { useNotes } from './hooks/useNotes';
++import { useNotesContext } from './contexts/NotesContext';
+ import './App.css';
+ 
+ export default function App() {
+-  const {
+-    sortedNotes,
+-    selectedId,
+-    selectedNote,
+-    createNote,
+-    deleteNote,
+-    updateBody,
+-    selectNote,
+-    flush,
+-  } = useNotes();
++  // Notes API now flows through the global context provider in main.tsx.
++  // Child components pull what they need from the same context directly,
++  // so we no longer pass notes-shaped props through this layout component.
++  const { selectedNote, createNote, flush } = useNotesContext();
+ 
+   useEffect(() => {
+     function onKey(e: KeyboardEvent) {
+@@ -40,21 +34,12 @@ export default function App() {
+ 
+   return (
+     <div className="app">
+-      <NoteList
+-        notes={sortedNotes}
+-        selectedId={selectedId}
+-        onSelect={selectNote}
+-        onCreate={createNote}
+-        onDelete={deleteNote}
+-      />
++      <NoteList />
+       <main className="workspace">
+         {selectedNote ? (
+           <>
+-            <Editor
+-              value={selectedNote.body}
+-              onChange={(body) => updateBody(selectedNote.id, body)}
+-            />
+-            <Preview body={selectedNote.body} />
++            <Editor />
++            <Preview />
+           </>
+         ) : (
+           <div className="workspace__empty">
+diff --git a/src/__tests__/NoteList.test.tsx b/src/__tests__/NoteList.test.tsx
+index a7fed3d..404afbf 100644
+--- a/src/__tests__/NoteList.test.tsx
++++ b/src/__tests__/NoteList.test.tsx
+@@ -1,100 +1,32 @@
+ import { fireEvent, render, screen } from '@testing-library/react';
+-import { describe, expect, it, vi } from 'vitest';
++import { describe, expect, it } from 'vitest';
+ import NoteList from '../components/NoteList';
++import { NotesProvider } from '../contexts/NotesContext';
+ 
+-const notes = [
+-  { id: 'a', body: '# Alpha', title: 'Alpha', createdAt: 1, updatedAt: 2 },
+-  { id: 'b', body: 'Beta line', title: 'Beta line', createdAt: 3, updatedAt: 4 },
+-];
++function renderWithProvider() {
++  return render(
++    <NotesProvider>
++      <NoteList />
++    </NotesProvider>,
++  );
++}
+ 
+ describe('NoteList', () => {
+   it('renders an empty-state message when there are no notes', () => {
+-    render(
+-      <NoteList
+-        notes={[]}
+-        selectedId={null}
+-        onSelect={() => {}}
+-        onCreate={() => {}}
+-        onDelete={() => {}}
+-      />,
+-    );
++    renderWithProvider();
+     expect(screen.getByText(/no notes yet/i)).toBeInTheDocument();
+   });
+ 
+-  it('renders titles and marks the selected one', () => {
+-    render(
+-      <NoteList
+-        notes={notes}
+-        selectedId="b"
+-        onSelect={() => {}}
+-        onCreate={() => {}}
+-        onDelete={() => {}}
+-      />,
+-    );
+-    expect(screen.getByText('Alpha')).toBeInTheDocument();
+-    const selected = screen.getByRole('option', { name: /beta line/i });
+-    expect(selected).toHaveAttribute('aria-selected', 'true');
+-  });
+-
+-  it('calls onSelect when a row is clicked', () => {
+-    const onSelect = vi.fn();
+-    render(
+-      <NoteList
+-        notes={notes}
+-        selectedId="a"
+-        onSelect={onSelect}
+-        onCreate={() => {}}
+-        onDelete={() => {}}
+-      />,
+-    );
+-    fireEvent.click(screen.getByRole('option', { name: /beta line/i }));
+-    expect(onSelect).toHaveBeenCalledWith('b');
+-  });
+-
+-  it('calls onCreate when New is clicked', () => {
+-    const onCreate = vi.fn();
+-    render(
+-      <NoteList
+-        notes={notes}
+-        selectedId="a"
+-        onSelect={() => {}}
+-        onCreate={onCreate}
+-        onDelete={() => {}}
+-      />,
+-    );
++  it('creates a note via the New button', () => {
++    renderWithProvider();
+     fireEvent.click(screen.getByRole('button', { name: /new note/i }));
+-    expect(onCreate).toHaveBeenCalledTimes(1);
++    // Provider-owned state — a new note row should now be visible.
++    expect(screen.getByRole('option')).toBeInTheDocument();
+   });
+ 
+   it('disables Delete when nothing is selected', () => {
+-    const onDelete = vi.fn();
+-    render(
+-      <NoteList
+-        notes={notes}
+-        selectedId={null}
+-        onSelect={() => {}}
+-        onCreate={() => {}}
+-        onDelete={onDelete}
+-      />,
+-    );
++    renderWithProvider();
+     const del = screen.getByRole('button', { name: /delete selected note/i });
+     expect(del).toBeDisabled();
+-    fireEvent.click(del);
+-    expect(onDelete).not.toHaveBeenCalled();
+-  });
+-
+-  it('passes the selected id to onDelete', () => {
+-    const onDelete = vi.fn();
+-    render(
+-      <NoteList
+-        notes={notes}
+-        selectedId="a"
+-        onSelect={() => {}}
+-        onCreate={() => {}}
+-        onDelete={onDelete}
+-      />,
+-    );
+-    fireEvent.click(screen.getByRole('button', { name: /delete selected note/i }));
+-    expect(onDelete).toHaveBeenCalledWith('a');
+   });
+ });
+diff --git a/src/components/Editor.tsx b/src/components/Editor.tsx
+index 9ba6adb..2c412da 100644
+--- a/src/components/Editor.tsx
++++ b/src/components/Editor.tsx
+@@ -1,18 +1,17 @@
+ /** Plain-textarea markdown editor. */
+ 
+-export interface EditorProps {
+-  value: string;
+-  onChange: (next: string) => void;
+-  disabled?: boolean;
+-}
++import { useNotesContext } from '../contexts/NotesContext';
+ 
+-export default function Editor({ value, onChange, disabled }: EditorProps) {
++export default function Editor() {
++  const { selectedNote, updateBody } = useNotesContext();
++  const value = selectedNote?.body ?? '';
++  const disabled = !selectedNote;
+   return (
+     <textarea
+       className="editor"
+       aria-label="Note editor"
+       value={value}
+-      onChange={(e) => onChange(e.target.value)}
++      onChange={(e) => selectedNote && updateBody(selectedNote.id, e.target.value)}
+       disabled={disabled}
+       spellCheck
+       placeholder={disabled ? '' : 'Write some markdown...'}
+diff --git a/src/components/NoteList.tsx b/src/components/NoteList.tsx
+index e42f269..7841719 100644
+--- a/src/components/NoteList.tsx
++++ b/src/components/NoteList.tsx
+@@ -1,31 +1,18 @@
+ /** Sidebar list of notes, sorted by updatedAt desc. */
+ 
+-import type { Note } from '../types';
++import { useNotesContext } from '../contexts/NotesContext';
+ 
+-export interface NoteListProps {
+-  notes: Array<Note & { title: string }>;
+-  selectedId: string | null;
+-  onSelect: (id: string) => void;
+-  onCreate: () => void;
+-  onDelete: (id: string) => void;
+-}
+-
+-export default function NoteList({
+-  notes,
+-  selectedId,
+-  onSelect,
+-  onCreate,
+-  onDelete,
+-}: NoteListProps) {
++export default function NoteList() {
++  const { sortedNotes: notes, selectedId, selectNote, createNote, deleteNote } = useNotesContext();
+   return (
+     <aside className="note-list" aria-label="Notes">
+       <div className="note-list__toolbar">
+-        <button type="button" onClick={onCreate} aria-label="New note">
++        <button type="button" onClick={createNote} aria-label="New note">
+           New
+         </button>
+         <button
+           type="button"
+-          onClick={() => selectedId && onDelete(selectedId)}
++          onClick={() => selectedId && deleteNote(selectedId)}
+           disabled={!selectedId}
+           aria-label="Delete selected note"
+         >
+@@ -47,7 +34,7 @@ export default function NoteList({
+                   className={
+                     selected ? 'note-list__item note-list__item--selected' : 'note-list__item'
+                   }
+-                  onClick={() => onSelect(note.id)}
++                  onClick={() => selectNote(note.id)}
+                 >
+                   <span className="note-list__title">{note.title}</span>
+                   <time className="note-list__time" dateTime={new Date(note.updatedAt).toISOString()}>
+diff --git a/src/components/Preview.tsx b/src/components/Preview.tsx
+index baa0fa1..6cf66da 100644
+--- a/src/components/Preview.tsx
++++ b/src/components/Preview.tsx
+@@ -1,13 +1,12 @@
+ /** Live-rendered markdown preview, sanitized via DOMPurify. */
+ 
+ import { useMemo } from 'react';
++import { useNotesContext } from '../contexts/NotesContext';
+ import { renderMarkdown } from '../utils/markdown';
+ 
+-export interface PreviewProps {
+-  body: string;
+-}
+-
+-export default function Preview({ body }: PreviewProps) {
++export default function Preview() {
++  const { selectedNote } = useNotesContext();
++  const body = selectedNote?.body ?? '';
+   const html = useMemo(() => renderMarkdown(body), [body]);
+   return (
+     <div
+diff --git a/src/contexts/NotesContext.tsx b/src/contexts/NotesContext.tsx
+new file mode 100644
+index 0000000..bfcbc2b
+--- /dev/null
++++ b/src/contexts/NotesContext.tsx
+@@ -0,0 +1,29 @@
++/** Global notes context — single provider wraps the app and exposes useNotes via context. */
++
++import { createContext, useContext, type ReactNode } from 'react';
++import { useNotes, type UseNotesApi } from '../hooks/useNotes';
++
++const NotesContext = createContext<UseNotesApi | null>(null);
++
++export interface NotesProviderProps {
++  children: ReactNode;
++}
++
++/**
++ * Wraps the application and exposes the notes API to any descendant via
++ * `useNotesContext`. Pulls the existing `useNotes` hook out of `App.tsx`
++ * so child components no longer need notes-shaped props threaded through.
++ */
++export function NotesProvider({ children }: NotesProviderProps) {
++  const api = useNotes();
++  return <NotesContext.Provider value={api}>{children}</NotesContext.Provider>;
++}
++
++/** Consume the notes API. Throws if used outside a `NotesProvider`. */
++export function useNotesContext(): UseNotesApi {
++  const ctx = useContext(NotesContext);
++  if (!ctx) {
++    throw new Error('useNotesContext must be used inside a <NotesProvider>');
++  }
++  return ctx;
++}
+diff --git a/src/main.tsx b/src/main.tsx
+index 7bd5311..6b75dbc 100644
+--- a/src/main.tsx
++++ b/src/main.tsx
+@@ -1,6 +1,7 @@
+ import { StrictMode } from 'react';
+ import { createRoot } from 'react-dom/client';
+ import App from './App';
++import { NotesProvider } from './contexts/NotesContext';
+ import './index.css';
+ 
+ const root = document.getElementById('root');
+@@ -8,6 +9,8 @@ if (!root) throw new Error('root element missing');
+ 
+ createRoot(root).render(
+   <StrictMode>
+-    <App />
++    <NotesProvider>
++      <App />
++    </NotesProvider>
+   </StrictMode>,
+ );

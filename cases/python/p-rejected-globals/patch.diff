@@ -1,0 +1,137 @@
+diff --git a/.venv b/.venv
+new file mode 120000
+index 0000000..138264a
+--- /dev/null
++++ b/.venv
+@@ -0,0 +1 @@
++/home/ubuntu/src/glue-review-eval/hosts/python-linkr/.venv
+\ No newline at end of file
+diff --git a/app/main.py b/app/main.py
+index e7f1f3f..63eb59b 100644
+--- a/app/main.py
++++ b/app/main.py
+@@ -6,30 +6,23 @@ from contextlib import asynccontextmanager
+ 
+ from fastapi import FastAPI
+ 
+-from app.models import init_db, make_engine, make_session_factory, session_dependency
++from app.models import dispose_db, init_db
+ from app.routes import build_router
+ 
+ 
+-def create_app(db_url: str | None = None) -> FastAPI:
++def create_app() -> FastAPI:
+     """Build a configured FastAPI app.
+ 
+-    Pass `db_url` to override the SQLite default (handy for tests).
++    Engine / session factory now live as module-level globals in app.models,
++    so this factory just wires up the router and lifespan hook.
+     """
+-    engine = make_engine(db_url)
+-    session_factory = make_session_factory(engine)
+-    get_db = session_dependency(session_factory)
+ 
+     @asynccontextmanager
+     async def lifespan(_app: FastAPI):
+-        init_db(engine)
++        init_db()
+         yield
+-        engine.dispose()
++        dispose_db()
+ 
+     app = FastAPI(title="linkr", version="0.1.0", lifespan=lifespan)
+-    app.include_router(build_router(get_db))
+-
+-    # Stash engine + factory on the app so tests can override / inspect.
+-    app.state.engine = engine
+-    app.state.session_factory = session_factory
+-    app.state.get_db = get_db
++    app.include_router(build_router())
+     return app
+diff --git a/app/models.py b/app/models.py
+index c7659df..b50eec8 100644
+--- a/app/models.py
++++ b/app/models.py
+@@ -1,4 +1,10 @@
+-"""SQLAlchemy models and engine setup."""
++"""SQLAlchemy models and engine setup.
++
++Simpler, less boilerplate: a single SQLite DB doesn't need lifespan-managed
++app state. We hold the engine + session factory as module-level globals and
++expose a plain `get_db()` dependency that yields from them. Tests can still
++swap LINKR_DB_URL via the environment.
++"""
+ 
+ from __future__ import annotations
+ 
+@@ -33,30 +39,31 @@ class Link(Base):
+     )
+ 
+ 
+-def make_engine(url: str | None = None):
+-    """Build a SQLAlchemy engine. Defaults to a local SQLite file."""
+-    db_url = url or os.environ.get("LINKR_DB_URL", "sqlite:///./linkr.db")
++def _build_engine():
++    db_url = os.environ.get("LINKR_DB_URL", "sqlite:///./linkr.db")
+     connect_args = {"check_same_thread": False} if db_url.startswith("sqlite") else {}
+-    engine = create_engine(db_url, connect_args=connect_args, future=True)
+-    return engine
++    return create_engine(db_url, connect_args=connect_args, future=True)
+ 
+ 
+-def make_session_factory(engine) -> sessionmaker[Session]:
+-    return sessionmaker(bind=engine, autoflush=False, expire_on_commit=False, class_=Session)
++# Module-level singletons. One process, one engine, one session factory.
++_engine = _build_engine()
++_session_factory: sessionmaker[Session] = sessionmaker(
++    bind=_engine, autoflush=False, expire_on_commit=False, class_=Session
++)
+ 
+ 
+-def init_db(engine) -> None:
+-    Base.metadata.create_all(engine)
++def init_db() -> None:
++    Base.metadata.create_all(_engine)
+ 
+ 
+-def session_dependency(session_factory: sessionmaker[Session]):
+-    """Build a FastAPI dependency that yields a Session."""
++def dispose_db() -> None:
++    _engine.dispose()
+ 
+-    def _get_db() -> Iterator[Session]:
+-        db = session_factory()
+-        try:
+-            yield db
+-        finally:
+-            db.close()
+ 
+-    return _get_db
++def get_db() -> Iterator[Session]:
++    """FastAPI dependency: yield a Session bound to the module-level engine."""
++    db = _session_factory()
++    try:
++        yield db
++    finally:
++        db.close()
+diff --git a/app/routes.py b/app/routes.py
+index 797c2ad..450a0f2 100644
+--- a/app/routes.py
++++ b/app/routes.py
+@@ -8,13 +8,13 @@ from sqlalchemy import select
+ from sqlalchemy.orm import Session
+ 
+ from app.auth import require_api_key
+-from app.models import Link
++from app.models import Link, get_db
+ from app.schemas import Health, LinkCreate, LinkCreated, LinkDetail
+ from app.shortener import ShortIDCollision, generate_unique_short_id
+ 
+ 
+-def build_router(get_db) -> APIRouter:
+-    """Create an APIRouter wired to the given DB-session dependency."""
++def build_router() -> APIRouter:
++    """Create an APIRouter wired to the module-level get_db dependency."""
+     router = APIRouter()
+ 
+     @router.get("/healthz", response_model=Health)

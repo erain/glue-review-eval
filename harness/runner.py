@@ -16,6 +16,7 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 from .cases import Case, discover_cases
@@ -137,6 +138,10 @@ def main():
         "--workdir", default="",
         help="optional persistent workdir (default: ephemeral tmpdir)",
     )
+    ap.add_argument(
+        "--sleep", type=float, default=4.0,
+        help="seconds to sleep between cases (rate-limit pacing; default 4s)",
+    )
     args = ap.parse_args()
 
     iter_dir = PATHS.results / args.iter
@@ -166,6 +171,11 @@ def main():
         except Exception as e:
             (iter_dir / f"{c.language}__{c.id}").mkdir(parents=True, exist_ok=True)
             (iter_dir / f"{c.language}__{c.id}" / "ERROR.log").write_text(repr(e))
+        # Pace requests so we stay under provider rate limits (OpenRouter
+        # free routes share a 20 req/min ceiling; NVIDIA's free tier
+        # rate-limits more aggressively at peak hours).
+        if i < len(cases):
+            time.sleep(args.sleep)
 
 
 if __name__ == "__main__":

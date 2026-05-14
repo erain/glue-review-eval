@@ -1,0 +1,58 @@
+id: t-stale-closure-effect
+language: typescript
+host: ts-notepad
+category: logic-bug
+severity: high
+title: "useNotes: save on window blur as a safety net"
+summary: |
+  Adds a `useEffect` in `useNotes` that registers a `window` blur
+  handler to flush the current state to localStorage immediately when
+  the user switches away from the tab. Framed as belt-and-braces
+  protection on top of the existing debounced persistence.
+
+planted:
+  description: |
+    The new effect runs once on mount (`[]` deps) and captures `state`
+    into a local `snapshot` constant inside the effect body. Every
+    subsequent edit replaces `state` in the outer scope, but `snapshot`
+    — and therefore the closure inside `onBlur` — keeps pointing at the
+    initial state value. The first blur after mount writes the
+    mount-time state; every later blur writes the same stale snapshot
+    again. New notes and edits made after mount are silently dropped on
+    blur, and on a reload the user sees their work disappear.
+
+    Two correct fixes exist: list `state` in the deps array (so the
+    effect re-binds the listener with a fresh closure each render), or
+    keep the empty deps and read `state` through a `useRef` that's
+    kept current. Either way the captured-snapshot pattern is wrong.
+  files:
+    - path: src/hooks/useNotes.ts
+      lines: [63, 80]
+      kind: stale-closure
+
+expected:
+  must_flag:
+    - "src/hooks/useNotes\\.ts|useNotes"
+    - "(stale closure|useEffect|dependency array|deps array|useCallback|useRef)"
+    - "(state|snapshot)"
+  must_not_flag:
+    - "xss"
+    - "sql injection"
+    - "race condition with localStorage quota"
+  fix_directives:
+    - "list `state` in the useEffect dependency array (or read state through a ref) so the blur handler sees the current snapshot"
+    - "drop the local `snapshot` constant; close over `state` (or `stateRef.current`) directly"
+    - "keep the cleanup that removes the blur listener on unmount"
+
+acceptance:
+  setup: []
+  test_cmd: "npm test -- --run src/__tests__/stale-closure.test.tsx"
+  timeout_s: 120
+
+notes: |
+  Acceptance test mounts `useNotes`, creates a note, makes two
+  edit-then-blur cycles, and asserts that `loadState` returns the
+  second edit. The buggy code persists only the mount-time snapshot
+  (an empty notes array) so `note?.body` is `undefined`. With `state`
+  in the deps array the listener re-binds on every render and the
+  final edit is persisted.

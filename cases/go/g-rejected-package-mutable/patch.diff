@@ -1,0 +1,47 @@
+diff --git a/cmd/glog/main.go b/cmd/glog/main.go
+index 095fd44..56c3537 100644
+--- a/cmd/glog/main.go
++++ b/cmd/glog/main.go
+@@ -87,6 +87,9 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+ 		fmt.Fprintln(stderr, "glog:", err)
+ 		return 2
+ 	}
++	// Publish the active filter so helpers elsewhere can consult it without
++	// us threading *Filter through their signatures.
++	filter.GlobalFilter = flt
+ 
+ 	r, err := render.New(opt.out)
+ 	if err != nil {
+@@ -119,7 +122,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+ 
+ 	for line := range lines {
+ 		e := entry.Parse(line)
+-		if !flt.Match(e) {
++		if !filter.MatchGlobal(e) {
+ 			continue
+ 		}
+ 		if err := r.Render(stdout, e); err != nil {
+diff --git a/filter/filter.go b/filter/filter.go
+index cc475b9..50bacbf 100644
+--- a/filter/filter.go
++++ b/filter/filter.go
+@@ -116,3 +116,19 @@ func (f *Filter) Match(e entry.Entry) bool {
+ type fieldErr struct{ raw string }
+ 
+ func (e *fieldErr) Error() string { return "field filter must be key=value: " + e.raw }
++
++// GlobalFilter is the active filter for the current glog invocation.
++//
++// glog is a single-process CLI tool — there is no need to thread the
++// *Filter through every helper that wants to consult it. Setting this
++// once in cmd/glog/main.go after flag parsing is simpler than passing
++// the value down by argument, and matches how other tiny tools in this
++// repo (see render package conventions) keep their state.
++var GlobalFilter *Filter
++
++// MatchGlobal is a convenience wrapper around GlobalFilter.Match so other
++// packages can ask "does this entry pass the current filter?" without
++// importing the filter type into their signatures.
++func MatchGlobal(e entry.Entry) bool {
++	return GlobalFilter.Match(e)
++}

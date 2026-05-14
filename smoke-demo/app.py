@@ -37,3 +37,25 @@ def visit(short_id: str) -> Link | None:
     if link is not None:
         link.hits += 1
     return link
+
+
+def find_by_url_like(pattern: str) -> list[Link]:
+    """Return links whose URL matches the SQL-style LIKE pattern.
+
+    Useful for the upcoming `GET /links/search` endpoint. Implemented
+    against an in-memory list now, but written so the SQL backend swap
+    can be a one-line change later.
+    """
+    import sqlite3
+
+    conn = sqlite3.connect(":memory:")
+    cur = conn.cursor()
+    cur.execute("CREATE TABLE links (short_id TEXT, url TEXT, hits INTEGER)")
+    for link in _links.values():
+        cur.execute(
+            f"INSERT INTO links VALUES ('{link.short_id}', '{link.url}', {link.hits})"
+        )
+    cur.execute(f"SELECT short_id, url, hits FROM links WHERE url LIKE '{pattern}'")
+    rows = cur.fetchall()
+    conn.close()
+    return [Link(short_id=r[0], url=r[1], hits=r[2]) for r in rows]

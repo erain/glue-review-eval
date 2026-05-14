@@ -1,0 +1,282 @@
+[
+  {
+    "case_id": "g-clean-extract",
+    "language": "go",
+    "category": "clean",
+    "flagged_file": 1.0,
+    "flagged_concept": 1.0,
+    "no_false_positives": 1.0,
+    "has_fix_block": 1.0,
+    "no_severity_bullets": 1.0
+  },
+  {
+    "case_id": "g-doc-stale-flag",
+    "language": "go",
+    "category": "doc",
+    "flagged_file": 1.0,
+    "flagged_concept": 1.0,
+    "no_false_positives": 1.0,
+    "has_fix_block": 0.0,
+    "no_severity_bullets": 1.0
+  },
+  {
+    "case_id": "g-ignored-unmarshal-err",
+    "language": "go",
+    "category": "logic-bug",
+    "flagged_file": 1.0,
+    "flagged_concept": 0.6666666666666666,
+    "no_false_positives": 1.0,
+    "has_fix_block": 0.0,
+    "no_severity_bullets": 1.0
+  },
+  {
+    "case_id": "g-leaked-file-handle",
+    "language": "go",
+    "category": "logic-bug",
+    "flagged_file": 1.0,
+    "flagged_concept": 1.0,
+    "no_false_positives": 1.0,
+    "has_fix_block": 0.0,
+    "no_severity_bullets": 1.0
+  },
+  {
+    "case_id": "g-missing-flag-test",
+    "language": "go",
+    "category": "missing-test",
+    "flagged_file": 1.0,
+    "flagged_concept": 0.6666666666666666,
+    "no_false_positives": 1.0,
+    "has_fix_block": 0.0,
+    "no_severity_bullets": 1.0
+  },
+  {
+    "case_id": "g-multi-render-and-test",
+    "language": "go",
+    "category": "multi-bug",
+    "flagged_file": 0.0,
+    "flagged_concept": 0.0,
+    "no_false_positives": 0.0,
+    "has_fix_block": 0.0,
+    "no_severity_bullets": 0.0
+  },
+  {
+    "case_id": "g-off-by-one-bound",
+    "language": "go",
+    "category": "logic-bug",
+    "flagged_file": 1.0,
+    "flagged_concept": 1.0,
+    "no_false_positives": 1.0,
+    "has_fix_block": 0.0,
+    "no_severity_bullets": 1.0
+  },
+  {
+    "case_id": "g-rejected-package-mutable",
+    "language": "go",
+    "category": "rejected-direction",
+    "flagged_file": 1.0,
+    "flagged_concept": 0.5,
+    "no_false_positives": 1.0,
+    "has_fix_block": 0.0,
+    "no_severity_bullets": 1.0
+  },
+  {
+    "case_id": "g-style-export-name",
+    "language": "go",
+    "category": "style",
+    "flagged_file": 1.0,
+    "flagged_concept": 1.0,
+    "no_false_positives": 1.0,
+    "has_fix_block": 0.0,
+    "no_severity_bullets": 1.0
+  },
+  {
+    "case_id": "p-clean-typing",
+    "language": "python",
+    "category": "clean",
+    "flagged_file": 1.0,
+    "flagged_concept": 1.0,
+    "no_false_positives": 1.0,
+    "has_fix_block": 1.0,
+    "no_severity_bullets": 1.0
+  },
+  {
+    "case_id": "p-doc-url-mismatch",
+    "language": "python",
+    "category": "doc",
+    "flagged_file": 1.0,
+    "flagged_concept": 1.0,
+    "no_false_positives": 1.0,
+    "has_fix_block": 0.0,
+    "no_severity_bullets": 1.0
+  },
+  {
+    "case_id": "p-missing-auth-delete",
+    "language": "python",
+    "category": "security",
+    "flagged_file": 1.0,
+    "flagged_concept": 1.0,
+    "no_false_positives": 1.0,
+    "has_fix_block": 0.0,
+    "no_severity_bullets": 1.0
+  },
+  {
+    "case_id": "p-multi-auth-and-test",
+    "language": "python",
+    "category": "multi-bug",
+    "flagged_file": 1.0,
+    "flagged_concept": 0.75,
+    "no_false_positives": 1.0,
+    "has_fix_block": 0.0,
+    "no_severity_bullets": 1.0
+  },
+  {
+    "case_id": "p-mutable-default-arg",
+    "language": "python",
+    "category": "logic-bug",
+    "flagged_file": 1.0,
+    "flagged_concept": 1.0,
+    "no_false_positives": 1.0,
+    "has_fix_block": 0.0,
+    "no_severity_bullets": 1.0
+  },
+  {
+    "case_id": "p-pydantic-loose-types",
+    "language": "python",
+    "category": "style",
+    "flagged_file": 1.0,
+    "flagged_concept": 1.0,
+    "no_false_positives": 1.0,
+    "has_fix_block": 0.0,
+    "no_severity_bullets": 1.0
+  },
+  {
+    "case_id": "p-rejected-globals",
+    "language": "python",
+    "category": "rejected-direction",
+    "flagged_file": 1.0,
+    "flagged_concept": 0.75,
+    "no_false_positives": 1.0,
+    "has_fix_block": 0.0,
+    "no_severity_bullets": 1.0
+  },
+  {
+    "case_id": "p-short-id-loop-no-cap",
+    "language": "python",
+    "category": "logic-bug",
+    "flagged_file": 0.0,
+    "flagged_concept": 0.5,
+    "no_false_positives": 1.0,
+    "has_fix_block": 0.0,
+    "no_severity_bullets": 1.0
+  },
+  {
+    "case_id": "p-sql-injection-stats",
+    "language": "python",
+    "category": "security",
+    "flagged_file": 1.0,
+    "flagged_concept": 1.0,
+    "no_false_positives": 1.0,
+    "has_fix_block": 0.0,
+    "no_severity_bullets": 1.0
+  },
+  {
+    "case_id": "p-test-only",
+    "language": "python",
+    "category": "test-only",
+    "flagged_file": 1.0,
+    "flagged_concept": 1.0,
+    "no_false_positives": 0.0,
+    "has_fix_block": 0.0,
+    "no_severity_bullets": 1.0
+  },
+  {
+    "case_id": "t-any-types-creep",
+    "language": "typescript",
+    "category": "style",
+    "flagged_file": 1.0,
+    "flagged_concept": 1.0,
+    "no_false_positives": 1.0,
+    "has_fix_block": 0.0,
+    "no_severity_bullets": 1.0
+  },
+  {
+    "case_id": "t-clean-theme-hook",
+    "language": "typescript",
+    "category": "clean",
+    "flagged_file": 1.0,
+    "flagged_concept": 0.0,
+    "no_false_positives": 1.0,
+    "has_fix_block": 1.0,
+    "no_severity_bullets": 1.0
+  },
+  {
+    "case_id": "t-debounce-removed",
+    "language": "typescript",
+    "category": "perf",
+    "flagged_file": 0.0,
+    "flagged_concept": 0.0,
+    "no_false_positives": 1.0,
+    "has_fix_block": 0.0,
+    "no_severity_bullets": 1.0
+  },
+  {
+    "case_id": "t-list-missing-key",
+    "language": "typescript",
+    "category": "style",
+    "flagged_file": 1.0,
+    "flagged_concept": 1.0,
+    "no_false_positives": 1.0,
+    "has_fix_block": 0.0,
+    "no_severity_bullets": 1.0
+  },
+  {
+    "case_id": "t-missing-shortcut-test",
+    "language": "typescript",
+    "category": "missing-test",
+    "flagged_file": 0.0,
+    "flagged_concept": 0.5,
+    "no_false_positives": 1.0,
+    "has_fix_block": 0.0,
+    "no_severity_bullets": 1.0
+  },
+  {
+    "case_id": "t-multi-effect-and-leak",
+    "language": "typescript",
+    "category": "multi-bug",
+    "flagged_file": 0.0,
+    "flagged_concept": 0.0,
+    "no_false_positives": 0.0,
+    "has_fix_block": 0.0,
+    "no_severity_bullets": 0.0
+  },
+  {
+    "case_id": "t-rejected-context-everything",
+    "language": "typescript",
+    "category": "rejected-direction",
+    "flagged_file": 0.0,
+    "flagged_concept": 0.0,
+    "no_false_positives": 0.0,
+    "has_fix_block": 0.0,
+    "no_severity_bullets": 0.0
+  },
+  {
+    "case_id": "t-stale-closure-effect",
+    "language": "typescript",
+    "category": "logic-bug",
+    "flagged_file": 0.0,
+    "flagged_concept": 0.0,
+    "no_false_positives": 1.0,
+    "has_fix_block": 0.0,
+    "no_severity_bullets": 1.0
+  },
+  {
+    "case_id": "t-xss-skip-sanitize",
+    "language": "typescript",
+    "category": "security",
+    "flagged_file": 0.0,
+    "flagged_concept": 0.0,
+    "no_false_positives": 1.0,
+    "has_fix_block": 0.0,
+    "no_severity_bullets": 1.0
+  }
+]

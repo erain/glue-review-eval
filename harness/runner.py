@@ -101,7 +101,7 @@ def _prepare_case_repo(case: Case, tmpdir: Path) -> Path:
     return repo
 
 
-def run_one(case: Case, iter_dir: Path, work_root: Path) -> Path:
+def run_one(case: Case, iter_dir: Path, work_root: Path, max_retries: int = 2) -> Path:
     out_dir = iter_dir / f"{case.language}__{case.id}"
     out_dir.mkdir(parents=True, exist_ok=True)
     repo = _prepare_case_repo(case, work_root)
@@ -123,10 +123,32 @@ def run_one(case: Case, iter_dir: Path, work_root: Path) -> Path:
         "--id", f"eval-{case.language}-{case.id}",
         "--max-turns", "8",
     ]
-    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=420)
-    (out_dir / "comment.md").write_text(proc.stdout)
-    (out_dir / "stderr.log").write_text(proc.stderr)
-    (out_dir / "exit_code").write_text(str(proc.returncode))
+
+    # Retry on upstream 429: free OpenRouter routes have minute-scoped
+    # ceilings (~20/min site-wide) and second-scoped upstream throttles
+    # at Novita that sometimes return 429 even when the per-min budget
+    # is fine. We back off and retry up to `max_retries` times.
+    for attempt in range(max_retries + 1):
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=420)
+        stdout, stderr = proc.stdout, proc.stderr
+        if proc.returncode == 0 and stdout.strip():
+            (out_dir / "comment.md").write_text(stdout)
+            (out_dir / "stderr.log").write_text(stderr)
+            (out_dir / "exit_code").write_text(str(proc.returncode))
+            return out_dir / "comment.md"
+
+        is_429 = "http 429" in stderr or "Rate limit" in stderr or "rate-limited" in stderr
+        if not is_429 or attempt == max_retries:
+            (out_dir / "comment.md").write_text(stdout)
+            (out_dir / "stderr.log").write_text(stderr)
+            (out_dir / "exit_code").write_text(str(proc.returncode))
+            return out_dir / "comment.md"
+
+        # Exponential backoff: 30s, 60s, 120s.
+        backoff = 30 * (2 ** attempt)
+        print(f"    429 on {case.id}; backing off {backoff}s (attempt {attempt + 1}/{max_retries})", flush=True)
+        time.sleep(backoff)
+
     return out_dir / "comment.md"
 
 
@@ -145,6 +167,10 @@ def main():
         "--sleep", type=float, default=4.0,
         help="seconds to sleep between cases (rate-limit pacing; default 4s)",
     )
+    ap.add_argument(
+        "--only-empty", action="store_true",
+        help="run only cases whose comment.md is missing or empty in this iter",
+    )
     args = ap.parse_args()
 
     iter_dir = PATHS.results / args.iter
@@ -153,6 +179,11 @@ def main():
     cases = discover_cases()
     if args.filter:
         cases = [c for c in cases if args.filter in c.id]
+    if args.only_empty:
+        def empty(c):
+            p = iter_dir / f"{c.language}__{c.id}" / "comment.md"
+            return (not p.exists()) or p.stat().st_size == 0
+        cases = [c for c in cases if empty(c)]
     if not cases:
         print("no cases discovered", file=sys.stderr)
         sys.exit(1)
